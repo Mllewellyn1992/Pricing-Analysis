@@ -1,0 +1,335 @@
+id: consumer_durables
+name: Consumer Durables
+version: 1
+factors:
+- id: factor_1_scale
+  name: Scale
+  weight_pct: 20
+  subfactors:
+  - id: total_sales
+    name: Total sales (USD billion)
+    metric: total_sales_usd_billion
+    weight_pct: 20
+    direction: higher_better
+    units: USD_billion
+    grid:
+    - band: Aaa
+      score: 1
+      min: 60.0
+      max: null
+    - band: Aa
+      score: 3
+      min: 20.0
+      max: 60.0
+    - band: A
+      score: 6
+      min: 10.0
+      max: 20.0
+    - band: Baa
+      score: 9
+      min: 4.0
+      max: 10.0
+    - band: Ba
+      score: 12
+      min: 1.5
+      max: 4.0
+    - band: B
+      score: 15
+      min: 0.5
+      max: 1.5
+    - band: Caa
+      score: 18
+      min: 0.25
+      max: 0.5
+    - band: Ca
+      score: 20
+      min: 0.0
+      max: 0.25
+- id: factor_2_business_profile
+  name: Business Profile
+  weight_pct: 25
+  subfactors:
+  - id: competitive_position
+    name: Competitive position (qualitative)
+    metric: competitive_position_band
+    weight_pct: 15
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 3
+    - band: A
+      score: 6
+    - band: Baa
+      score: 9
+    - band: Ba
+      score: 12
+    - band: B
+      score: 15
+    - band: Caa
+      score: 18
+    - band: Ca
+      score: 20
+  - id: brand_strength
+    name: Brand strength (qualitative)
+    metric: brand_strength_band
+    weight_pct: 10
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 3
+    - band: A
+      score: 6
+    - band: Baa
+      score: 9
+    - band: Ba
+      score: 12
+    - band: B
+      score: 15
+    - band: Caa
+      score: 18
+    - band: Ca
+      score: 20
+- id: factor_3_profitability
+  name: Profitability
+  weight_pct: 5
+  subfactors:
+  - id: ebit_margin
+    name: EBIT margin
+    metric: ebit_margin_pct
+    weight_pct: 5
+    direction: higher_better
+    units: percent
+    grid:
+    - band: Aaa
+      score: 1
+      min: 27.0
+      max: null
+    - band: Aa
+      score: 3
+      min: 22.0
+      max: 27.0
+    - band: A
+      score: 6
+      min: 17.0
+      max: 22.0
+    - band: Baa
+      score: 9
+      min: 13.0
+      max: 17.0
+    - band: Ba
+      score: 12
+      min: 10.0
+      max: 13.0
+    - band: B
+      score: 15
+      min: 7.0
+      max: 10.0
+    - band: Caa
+      score: 18
+      min: 4.0
+      max: 7.0
+    - band: Ca
+      score: 20
+      min: 0.0
+      max: 4.0
+- id: factor_4_leverage_coverage
+  name: Leverage and Coverage
+  weight_pct: 35
+  subfactors:
+  - id: debt_ebitda
+    name: Debt / EBITDA
+    metric: debt_ebitda_x
+    weight_pct: 15
+    direction: lower_better
+    units: times
+    grid:
+    - band: Aaa
+      score: 1
+      min: 0.0
+      max: 0.5
+    - band: Aa
+      score: 3
+      min: 0.5
+      max: 1.0
+    - band: A
+      score: 6
+      min: 1.0
+      max: 2.0
+    - band: Baa
+      score: 9
+      min: 2.0
+      max: 3.0
+    - band: Ba
+      score: 12
+      min: 3.0
+      max: 4.0
+    - band: B
+      score: 15
+      min: 4.0
+      max: 6.0
+    - band: Caa
+      score: 18
+      min: 6.0
+      max: 8.0
+    - band: Ca
+      score: 20
+      min: 8.0
+      max: null
+    special_cases:
+    - when:
+        total_debt: 0
+      band: Aaa
+      score: 1
+      note: When debt is zero, the score is Aaa.
+    - when:
+        total_debt_gt_0: true
+        ebitda_lt_0: true
+      band: Ca
+      score: 20
+      note: When debt is positive and EBITDA is negative, the score is Ca.
+  - id: rcf_net_debt
+    name: RCF / Net debt
+    metric: rcf_net_debt_pct
+    weight_pct: 10
+    direction: higher_better
+    units: percent
+    grid:
+    - band: Aaa
+      score: 1
+      min: 70.0
+      max: null
+    - band: Aa
+      score: 3
+      min: 50.0
+      max: 70.0
+    - band: A
+      score: 6
+      min: 33.0
+      max: 50.0
+    - band: Baa
+      score: 9
+      min: 21.0
+      max: 33.0
+    - band: Ba
+      score: 12
+      min: 15.0
+      max: 21.0
+    - band: B
+      score: 15
+      min: 7.0
+      max: 15.0
+    - band: Caa
+      score: 18
+      min: 0.0
+      max: 7.0
+    - band: Ca
+      score: 20
+      min: null
+      max: 0.0
+    special_cases:
+    - when:
+        net_debt_lt_0: true
+        rcf_gt_0: true
+      band: Aaa
+      score: 1
+      note: When net debt is negative and RCF is positive, the score is Aaa.
+    - when:
+        net_debt_lt_0: true
+        rcf_lt_0: true
+      band: Ca
+      score: 20
+      note: When net debt is negative and RCF is negative, the score is Ca.
+  - id: ebit_interest
+    name: EBIT / Interest expense
+    metric: ebit_interest_x
+    weight_pct: 10
+    direction: higher_better
+    units: times
+    grid:
+    - band: Aaa
+      score: 1
+      min: 18.0
+      max: null
+    - band: Aa
+      score: 3
+      min: 12.0
+      max: 18.0
+    - band: A
+      score: 6
+      min: 7.0
+      max: 12.0
+    - band: Baa
+      score: 9
+      min: 4.0
+      max: 7.0
+    - band: Ba
+      score: 12
+      min: 2.5
+      max: 4.0
+    - band: B
+      score: 15
+      min: 1.0
+      max: 2.5
+    - band: Caa
+      score: 18
+      min: 0.5
+      max: 1.0
+    - band: Ca
+      score: 20
+      min: 0.0
+      max: 0.5
+- id: factor_5_financial_policy
+  name: Financial Policy
+  weight_pct: 15
+  subfactors:
+  - id: financial_policy
+    name: Financial policy (qualitative)
+    metric: financial_policy_band
+    weight_pct: 15
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 3
+    - band: A
+      score: 6
+    - band: Baa
+      score: 9
+    - band: Ba
+      score: 12
+    - band: B
+      score: 15
+    - band: Caa
+      score: 18
+    - band: Ca
+      score: 20
+score_to_rating:
+- min_score: 1.0
+  max_score: 2.0
+  rating: Aaa
+- min_score: 2.0
+  max_score: 4.5
+  rating: Aa
+- min_score: 4.5
+  max_score: 7.5
+  rating: A
+- min_score: 7.5
+  max_score: 10.5
+  rating: Baa
+- min_score: 10.5
+  max_score: 13.5
+  rating: Ba
+- min_score: 13.5
+  max_score: 16.5
+  rating: B
+- min_score: 16.5
+  max_score: 19.0
+  rating: Caa
+- min_score: 19.0
+  max_score: 99.9
+  rating: Ca

@@ -1,0 +1,184 @@
+id: building_materials
+name: Building Materials Industry
+version: 1
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 5
+    subfactors:
+      - id: revenues
+        name: Revenues (USD Billion)
+        metric: revenue_usd_billion
+        weight_pct: 5 # from grid; engine will normalise within factor
+        direction: higher_better
+        units: USD_billion
+        grid:
+          - { band: "Aaa", score: 1, min: 40.0, max: null }
+          - { band: "Aa", score: 3, min: 20.0, max: 40.0 }
+          - { band: "A", score: 6, min: 10.0, max: 20.0 }
+          - { band: "Baa", score: 9, min: 3.0, max: 10.0 }
+          - { band: "Ba", score: 12, min: 1.25, max: 3.0 }
+          - { band: "B", score: 15, min: 0.25, max: 1.25 }
+          - { band: "Caa", score: 18, min: 0.10, max: 0.25 }
+          - { band: "Ca", score: 20, min: 0.0, max: 0.10 }
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 15
+    subfactors:
+      - id: business_profile
+        name: Business profile (qualitative)
+        metric: business_profile_band
+        weight_pct: 15
+        direction: qualitative
+        grid:
+          # User picks one of these bands; engine uses the score.
+          - { band: "Aaa", score: 1 }
+          - { band: "Aa", score: 3 }
+          - { band: "A", score: 6 }
+          - { band: "Baa", score: 9 }
+          - { band: "Ba", score: 12 }
+          - { band: "B", score: 15 }
+          - { band: "Caa", score: 18 }
+          - { band: "Ca", score: 20 }
+  - id: factor_3_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 30
+    subfactors:
+      - id: operating_margin
+        name: Operating margin
+        metric: operating_margin_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 30.0, max: null }
+          - { band: "Aa", score: 3, min: 24.0, max: 30.0 }
+          - { band: "A", score: 6, min: 18.0, max: 24.0 }
+          - { band: "Baa", score: 9, min: 12.5, max: 18.0 }
+          - { band: "Ba", score: 12, min: 7.5, max: 12.5 }
+          - { band: "B", score: 15, min: 2.5, max: 7.5 }
+          - { band: "Caa", score: 18, min: 1.0, max: 2.5 }
+          - { band: "Ca", score: 20, min: 0.0, max: 1.0 }
+      - id: operating_margin_volatility
+        name: Operating margin volatility
+        metric: operating_margin_volatility_pct
+        weight_pct: 10
+        direction: lower_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 2.5 } # < 2.5%
+          - { band: "Aa", score: 3, min: 2.5, max: 5.0 }
+          - { band: "A", score: 6, min: 5.0, max: 10.0 }
+          - { band: "Baa", score: 9, min: 10.0, max: 17.5 }
+          - { band: "Ba", score: 12, min: 17.5, max: 25.0 }
+          - { band: "B", score: 15, min: 25.0, max: 40.0 }
+          - { band: "Caa", score: 18, min: 40.0, max: 50.0 }
+          - { band: "Ca", score: 20, min: 50.0, max: null } # ≥ 50%
+      - id: ebit_avg_assets
+        name: EBIT / Average assets
+        metric: ebit_avg_assets_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 25.0, max: null }
+          - { band: "Aa", score: 3, min: 16.0, max: 25.0 }
+          - { band: "A", score: 6, min: 11.0, max: 16.0 }
+          - { band: "Baa", score: 9, min: 7.0, max: 11.0 }
+          - { band: "Ba", score: 12, min: 4.0, max: 7.0 }
+          - { band: "B", score: 15, min: 2.0, max: 4.0 }
+          - { band: "Caa", score: 18, min: 1.0, max: 2.0 }
+          - { band: "Ca", score: 20, min: 0.0, max: 1.0 }
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 40
+    subfactors:
+      - id: debt_book_cap
+        name: Debt / Book capitalization
+        metric: debt_book_cap_pct
+        weight_pct: 10
+        direction: lower_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 15.0 } # < 15%
+          - { band: "Aa", score: 3, min: 15.0, max: 20.0 }
+          - { band: "A", score: 6, min: 20.0, max: 30.0 }
+          - { band: "Baa", score: 9, min: 30.0, max: 45.0 }
+          - { band: "Ba", score: 12, min: 45.0, max: 65.0 }
+          - { band: "B", score: 15, min: 65.0, max: 80.0 }
+          - { band: "Caa", score: 18, min: 80.0, max: 100.0 }
+          - { band: "Ca", score: 20, min: 100.0, max: null } # ≥ 100%
+      - id: debt_ebitda
+        name: Debt / EBITDA
+        metric: debt_ebitda_x
+        weight_pct: 10
+        direction: lower_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 1.0 } # < 1x
+          - { band: "Aa", score: 3, min: 1.0, max: 1.75 }
+          - { band: "A", score: 6, min: 1.75, max: 2.5 }
+          - { band: "Baa", score: 9, min: 2.5, max: 3.5 }
+          - { band: "Ba", score: 12, min: 3.5, max: 4.5 }
+          - { band: "B", score: 15, min: 4.5, max: 6.0 }
+          - { band: "Caa", score: 18, min: 6.0, max: 7.0 }
+          - { band: "Ca", score: 20, min: 7.0, max: null } # ≥ 7x
+      - id: ebit_interest
+        name: EBIT / Interest expense
+        metric: ebit_interest_x
+        weight_pct: 10
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 16.0, max: null }
+          - { band: "Aa", score: 3, min: 10.0, max: 16.0 }
+          - { band: "A", score: 6, min: 7.0, max: 10.0 }
+          - { band: "Baa", score: 9, min: 4.0, max: 7.0 }
+          - { band: "Ba", score: 12, min: 2.0, max: 4.0 }
+          - { band: "B", score: 15, min: 1.0, max: 2.0 }
+          - { band: "Caa", score: 18, min: 0.5, max: 1.0 }
+          - { band: "Ca", score: 20, min: 0.0, max: 0.5 }
+      - id: rcf_net_debt
+        name: RCF / Net debt
+        metric: rcf_net_debt_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 70.0, max: null }
+          - { band: "Aa", score: 3, min: 50.0, max: 70.0 }
+          - { band: "A", score: 6, min: 35.0, max: 50.0 }
+          - { band: "Baa", score: 9, min: 20.0, max: 35.0 }
+          - { band: "Ba", score: 12, min: 10.0, max: 20.0 }
+          - { band: "B", score: 15, min: 5.0, max: 10.0 }
+          - { band: "Caa", score: 18, min: 2.5, max: 5.0 }
+          - { band: "Ca", score: 20, min: 0.0, max: 2.5 }
+  - id: factor_5_financial_policy
+    name: Financial Policy
+    weight_pct: 10
+    subfactors:
+      - id: financial_policy
+        name: Financial policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 10
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1 }
+          - { band: "Aa", score: 3 }
+          - { band: "A", score: 6 }
+          - { band: "Baa", score: 9 }
+          - { band: "Ba", score: 12 }
+          - { band: "B", score: 15 }
+          - { band: "Caa", score: 18 }
+          - { band: "Ca", score: 20 }
+score_to_rating:
+  # Grid-score → rating mapping aligned to 1–20 band scale
+  - { min_score: 1.0, max_score: 2.0, rating: "Aaa" }
+  - { min_score: 2.0, max_score: 4.5, rating: "Aa" }
+  - { min_score: 4.5, max_score: 7.5, rating: "A" }
+  - { min_score: 7.5, max_score: 10.5, rating: "Baa" }
+  - { min_score: 10.5, max_score: 13.5, rating: "Ba" }
+  - { min_score: 13.5, max_score: 16.5, rating: "B" }
+  - { min_score: 16.5, max_score: 19.0, rating: "Caa" }
+  - { min_score: 19.0, max_score: 99.9, rating: "Ca" }
+
