@@ -1,0 +1,168 @@
+id: aerospace_defense
+name: Aerospace and Defense
+version: "18 Jul 2025"
+
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 20
+    subfactors:
+      - id: revenue
+        name: Revenue (USD Billion)
+        metric: revenue_usd_billion
+        weight_pct: 20
+        direction: higher_better
+        units: USD_billion
+        grid:
+          - { band: "Aaa", score: 1, min: 60.0, max: null }     # > $60bn (linear endpoint $100bn)
+          - { band: "Aa",  score: 2, min: 30.0, max: 60.0 }
+          - { band: "A",   score: 3, min: 15.0, max: 30.0 }
+          - { band: "Baa", score: 4, min: 8.0,  max: 15.0 }
+          - { band: "Ba",  score: 5, min: 3.0,  max: 8.0 }
+          - { band: "B",   score: 6, min: 1.0,  max: 3.0 }
+          - { band: "Caa", score: 7, min: 0.25, max: 1.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 0.25 }     # < $0.25bn
+
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 20
+    subfactors:
+      - id: market_position
+        name: Market Position (qualitative)
+        metric: market_position_band
+        weight_pct: 10
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1 }
+          - { band: "Aa",  score: 2 }
+          - { band: "A",   score: 3 }
+          - { band: "Baa", score: 4 }
+          - { band: "Ba",  score: 5 }
+          - { band: "B",   score: 6 }
+          - { band: "Caa", score: 7 }
+          - { band: "Ca",  score: 8 }
+
+      - id: revenue_earnings_stability
+        name: Revenue and Earnings Stability (qualitative)
+        metric: revenue_earnings_stability_band
+        weight_pct: 10
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1 }
+          - { band: "Aa",  score: 2 }
+          - { band: "A",   score: 3 }
+          - { band: "Baa", score: 4 }
+          - { band: "Ba",  score: 5 }
+          - { band: "B",   score: 6 }
+          - { band: "Caa", score: 7 }
+          - { band: "Ca",  score: 8 }
+
+  - id: factor_3_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 10
+    subfactors:
+      - id: ebit_margin
+        name: EBIT Margin
+        metric: ebit_margin_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 25.0, max: null }      # > 25% (linear endpoint 40%)
+          - { band: "Aa",  score: 2, min: 20.0, max: 25.0 }
+          - { band: "A",   score: 3, min: 15.0, max: 20.0 }
+          - { band: "Baa", score: 4, min: 10.0, max: 15.0 }
+          - { band: "Ba",  score: 5, min: 7.0,  max: 10.0 }
+          - { band: "B",   score: 6, min: 4.0,  max: 7.0 }
+          - { band: "Caa", score: 7, min: 1.0,  max: 4.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 1.0 }       # < 1%
+
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 30
+    subfactors:
+      - id: debt_ebitda
+        name: Debt / EBITDA
+        metric: debt_ebitda_x
+        weight_pct: 10
+        direction: lower_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 0.5 }        # < 0.5x (linear endpoint 0x)
+          - { band: "Aa",  score: 2, min: 0.5, max: 1.0 }
+          - { band: "A",   score: 3, min: 1.0, max: 2.0 }
+          - { band: "Baa", score: 4, min: 2.0, max: 3.0 }
+          - { band: "Ba",  score: 5, min: 3.0, max: 4.0 }
+          - { band: "B",   score: 6, min: 4.0, max: 6.0 }
+          - { band: "Caa", score: 7, min: 6.0, max: 8.0 }
+          - { band: "Ca",  score: 8, min: 8.0, max: null }      # > 8x
+        special_cases:
+          - when: { total_debt: 0 }
+            band: "Aaa"
+            score: 1
+            note: "When debt is zero, the score is Aaa."
+          - when: { total_debt_gt_0: true, ebitda_lt_0: true }
+            band: "Ca"
+            score: 8
+            note: "When debt is positive and EBITDA is negative, the score is Ca."
+
+      - id: ebitda_interest
+        name: EBITDA / Interest Expense
+        metric: ebitda_interest_x
+        weight_pct: 10
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 20.0, max: null }      # > 20x (linear endpoint 30x)
+          - { band: "Aa",  score: 2, min: 15.0, max: 20.0 }
+          - { band: "A",   score: 3, min: 10.0, max: 15.0 }
+          - { band: "Baa", score: 4, min: 5.0,  max: 10.0 }
+          - { band: "Ba",  score: 5, min: 2.5,  max: 5.0 }
+          - { band: "B",   score: 6, min: 1.0,  max: 2.5 }
+          - { band: "Caa", score: 7, min: 0.5,  max: 1.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 0.5 }      # < 0.5x
+
+      - id: rcf_net_debt
+        name: RCF / Net Debt
+        metric: rcf_net_debt_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 70.0, max: null }      # > 70% (linear endpoint 100% when net debt > 0)
+          - { band: "Aa",  score: 2, min: 50.0, max: 70.0 }
+          - { band: "A",   score: 3, min: 35.0, max: 50.0 }
+          - { band: "Baa", score: 4, min: 20.0, max: 35.0 }
+          - { band: "Ba",  score: 5, min: 13.0, max: 20.0 }
+          - { band: "B",   score: 6, min: 5.0,  max: 13.0 }
+          - { band: "Caa", score: 7, min: 0.0,  max: 5.0 }
+          - { band: "Ca",  score: 8, min: null, max: 0.0 }      # < 0%
+        special_cases:
+          - when: { net_debt_lt_0: true, rcf_gt_0: true }
+            band: "Aaa"
+            score: 1
+            note: "When net debt is negative and RCF is positive, treat as Aaa for this ratio."
+          - when: { net_debt_lt_0: true, rcf_lt_0: true }
+            band: "Ca"
+            score: 8
+            note: "When net debt is negative and RCF is negative, treat as Ca for this ratio."
+
+  - id: factor_5_financial_policy
+    name: Financial Policy
+    weight_pct: 20
+    subfactors:
+      - id: financial_policy
+        name: Financial Policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 20
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1 }
+          - { band: "Aa",  score: 2 }
+          - { band: "A",   score: 3 }
+          - { band: "Baa", score: 4 }
+          - { band: "Ba",  score: 5 }
+          - { band: "B",   score: 6 }
+          - { band: "Caa", score: 7 }
+          - { band: "Ca",  score: 8 }
+

@@ -1,0 +1,286 @@
+id: consumer_packaged_goods
+name: Consumer Packaged Goods
+version: "23 Jun 2022"
+
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 20
+    subfactors:
+      - id: revenue
+        name: Revenue (USD Billion)
+        metric: revenue_usd_billion
+        weight_pct: 20
+        direction: higher_better
+        units: USD_billion
+        grid:
+          - { band: "Aaa", score: 1, min: 60.0, max: null }
+          - { band: "Aa",  score: 2, min: 30.0, max: 60.0 }
+          - { band: "A",   score: 3, min: 10.0, max: 30.0 }
+          - { band: "Baa", score: 4, min: 4.0,  max: 10.0 }
+          - { band: "Ba",  score: 5, min: 1.5,  max: 4.0 }
+          - { band: "B",   score: 6, min: 0.5,  max: 1.5 }
+          - { band: "Caa", score: 7, min: 0.25, max: 0.5 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 0.25 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 100.0
+          ca_endpoint_value: 0.0
+
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 30
+    subfactors:
+      - id: geographic_diversification
+        name: Geographic Diversification (qualitative)
+        metric: geographic_diversification_band
+        weight_pct: 10
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Fully diversified presence globally; any limited concentration in the largest markets reflects the global importance of those markets.
+          - band: "Aa"
+            score: 2
+            description: Worldwide presence; well-diversified globally with no material concentration.
+          - band: "A"
+            score: 3
+            description: Worldwide presence; moderate degree of concentration in some regions.
+          - band: "Baa"
+            score: 4
+            description: Worldwide presence, with increased degree of concentration in some regions.
+          - band: "Ba"
+            score: 5
+            description: Broad continental presence (Americas, Europe, Asia), with some presence in additional regions.
+          - band: "B"
+            score: 6
+            description: Broad continental presence (Americas, Europe, Asia), without significant presence in additional regions.
+          - band: "Caa"
+            score: 7
+            description: Broad presence in a single major country or presence across a portion of a continent.
+          - band: "Ca"
+            score: 8
+            description: Regional presence within a country.
+
+      - id: segmental_diversification
+        name: Segmental Diversification (qualitative)
+        metric: segmental_diversification_band
+        weight_pct: 10
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: More than 8 relatively balanced market segments.
+          - band: "Aa"
+            score: 2
+            description: 7 - 8 relatively balanced segments.
+          - band: "A"
+            score: 3
+            description: 5 - 6 relatively balanced segments.
+          - band: "Baa"
+            score: 4
+            description: 4 relatively balanced segments.
+          - band: "Ba"
+            score: 5
+            description: 2 - 3 relatively balanced segments.
+          - band: "B"
+            score: 6
+            description: Multiple segments, but one segment accounts for over 60% of sales.
+          - band: "Caa"
+            score: 7
+            description: Multiple segments, but one segment accounts for over 90% of sales.
+          - band: "Ca"
+            score: 8
+            description: Single segment.
+
+      - id: market_position
+        name: Market Position (qualitative)
+        metric: market_position_band
+        weight_pct: 5
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Clear global leader in multiple, broad categories.
+          - band: "Aa"
+            score: 2
+            description: Clear global leader in at least one broad category.
+          - band: "A"
+            score: 3
+            description: Mostly No. 1 in broad categories in key markets.
+          - band: "Baa"
+            score: 4
+            description: Mostly No. 2 in broad categories in key markets.
+          - band: "Ba"
+            score: 5
+            description: Top tier in broad categories or No. 1 in narrowly defined but large categories.
+          - band: "B"
+            score: 6
+            description: Second tier in broad categories or at least No. 2 in narrowly defined but large categories.
+          - band: "Caa"
+            score: 7
+            description: Weakly positioned in broad categories or second tier in narrowly defined categories.
+          - band: "Ca"
+            score: 8
+            description: Weakly positioned in all categories or in a highly fragmented category.
+
+      - id: category_assessment
+        name: Category Assessment (qualitative)
+        metric: category_assessment_band
+        weight_pct: 5
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Very strong innovation; very broad appeal; low degree of price elasticity; highly consistent demand; strong growth potential.
+          - band: "Aa"
+            score: 2
+            description: Strong innovation; broad appeal; low degree of price elasticity; consistent demand; strong growth potential.
+          - band: "A"
+            score: 3
+            description: Good innovation; broad appeal; low degree of price elasticity; consistent demand; solid growth potential.
+          - band: "Baa"
+            score: 4
+            description: Moderate innovation; broad appeal; moderate degree of price elasticity; consistent demand; moderate growth potential.
+          - band: "Ba"
+            score: 5
+            description: Scope for innovation; variable appeal; may be narrowly defined but large categories; vulnerable to higher degree of price elasticity; potential for variable demand; limited growth potential.
+          - band: "B"
+            score: 6
+            description: Limited innovation; narrow appeal; may be vulnerable to higher degree of price elasticity; potential for variable demand; low growth potential.
+          - band: "Caa"
+            score: 7
+            description: Low innovation; narrow appeal; high degree of price elasticity; potentially negative growth prospects.
+          - band: "Ca"
+            score: 8
+            description: Secular decline; highly cyclical or commodity-like; no pricing power.
+
+  - id: factor_3_profitability_efficiency
+    name: Profitability
+    weight_pct: 10
+    subfactors:
+      - id: ebita_margin
+        name: EBITA Margin
+        metric: ebita_margin_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 30.0, max: null }
+          - { band: "Aa",  score: 2, min: 25.0, max: 30.0 }
+          - { band: "A",   score: 3, min: 20.0, max: 25.0 }
+          - { band: "Baa", score: 4, min: 15.0, max: 20.0 }
+          - { band: "Ba",  score: 5, min: 12.5, max: 15.0 }
+          - { band: "B",   score: 6, min: 10.0, max: 12.5 }
+          - { band: "Caa", score: 7, min: 5.0,  max: 10.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 5.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 50.0
+          ca_endpoint_value: 0.0
+
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 25
+    subfactors:
+      - id: debt_ebitda
+        name: Debt / EBITDA
+        metric: debt_ebitda_x
+        weight_pct: 10
+        direction: lower_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0,  max: 0.75 }
+          - { band: "Aa",  score: 2, min: 0.75, max: 1.5 }
+          - { band: "A",   score: 3, min: 1.5,  max: 2.5 }
+          - { band: "Baa", score: 4, min: 2.5,  max: 3.5 }
+          - { band: "Ba",  score: 5, min: 3.5,  max: 4.5 }
+          - { band: "B",   score: 6, min: 4.5,  max: 6.5 }
+          - { band: "Caa", score: 7, min: 6.5,  max: 10.0 }
+          - { band: "Ca",  score: 8, min: 10.0, max: null }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 0.0
+          ca_endpoint_value: 15.0
+        special_cases:
+          - when: { ebitda_lt_0: true }
+            band: "Ca"
+            score: 8
+            note: "Negative EBITDA treated as 15x or worse (numeric 20.5)."
+
+      - id: rcf_net_debt
+        name: RCF / Net Debt
+        metric: rcf_net_debt_pct
+        weight_pct: 7.5
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 70.0, max: null }
+          - { band: "Aa",  score: 2, min: 50.0, max: 70.0 }
+          - { band: "A",   score: 3, min: 35.0, max: 50.0 }
+          - { band: "Baa", score: 4, min: 20.0, max: 35.0 }
+          - { band: "Ba",  score: 5, min: 15.0, max: 20.0 }
+          - { band: "B",   score: 6, min: 8.0,  max: 15.0 }
+          - { band: "Caa", score: 7, min: 1.0,  max: 8.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 1.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 100.0
+          ca_endpoint_value: 0.0
+        special_cases:
+          - when: { net_debt_lt_0: true, rcf_gt_0: true }
+            numeric_score: 0.5
+            note: "If net debt is negative and RCF positive, numeric score is 0.5."
+          - when: { net_debt_lt_0: true, rcf_lte_0: true }
+            numeric_score: 20.5
+            note: "If net debt is negative and RCF negative or zero, numeric score is 20.5."
+
+      - id: ebita_interest
+        name: EBITA / Interest Expense
+        metric: ebita_interest_x
+        weight_pct: 7.5
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 20.0, max: null }
+          - { band: "Aa",  score: 2, min: 12.5, max: 20.0 }
+          - { band: "A",   score: 3, min: 7.5,  max: 12.5 }
+          - { band: "Baa", score: 4, min: 5.0,  max: 7.5 }
+          - { band: "Ba",  score: 5, min: 2.5,  max: 5.0 }
+          - { band: "B",   score: 6, min: 1.0,  max: 2.5 }
+          - { band: "Caa", score: 7, min: 0.5,  max: 1.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 0.5 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 40.0
+          ca_endpoint_value: 0.0
+
+  - id: factor_5_financial_policy
+    name: Financial Policy
+    weight_pct: 15
+    subfactors:
+      - id: financial_policy
+        name: Financial Policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 15
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Expected to have extremely conservative financial policies (including risk and liquidity management); very stable metrics; essentially no event risk that would cause a rating transition; and public commitment to a very strong credit profile over the long term.
+          - band: "Aa"
+            score: 2
+            description: Expected to have very conservative financial policies (including risk and liquidity management); stable metrics; minimal event risk that would cause a rating transition; and public commitment to a strong credit profile over the long term.
+          - band: "A"
+            score: 3
+            description: Expected to have predictable financial policies (including risk and liquidity management) that preserve creditor interests; although modest event risk exists, the effect on leverage is likely to be small and temporary; strong commitment to a solid credit profile.
+          - band: "Baa"
+            score: 4
+            description: Expected to have financial policies (including risk and liquidity management) that balance the interests of creditors and shareholders; some risk exists that debt-funded acquisitions or shareholder distributions could lead to a weaker credit profile.
+          - band: "Ba"
+            score: 5
+            description: Expected to have financial policies (including risk and liquidity management) that tend to favor shareholders over creditors; high financial risk resulting from shareholder distributions, acquisitions or other significant capital structure changes.
+          - band: "B"
+            score: 6
+            description: Expected to have financial policies (including risk and liquidity management) that favor shareholders over creditors; high financial risk resulting from shareholder distributions, acquisitions or other significant capital structure changes.
+          - band: "Caa"
+            score: 7
+            description: Expected to have financial policies (including risk and liquidity management) that create elevated risk of debt restructuring in varied economic environments.
+          - band: "Ca"
+            score: 8
+            description: Expected to have financial policies (including risk and liquidity management) that create elevated risk of debt restructuring even in healthy economic environments.

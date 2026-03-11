@@ -1,0 +1,159 @@
+id: construction
+name: Construction
+version: "3 Apr 2025"
+
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 20
+    subfactors:
+      - id: revenue
+        name: Revenue (USD Billion)
+        metric: revenue_usd_billion
+        weight_pct: 20
+        direction: higher_better
+        units: USD_billion
+        grid:
+          - { band: "Aaa", score: 1, min: 60.0,  max: null }     # >= $60
+          - { band: "Aa",  score: 2, min: 30.0,  max: 60.0 }
+          - { band: "A",   score: 3, min: 15.0,  max: 30.0 }
+          - { band: "Baa", score: 4, min: 8.0,   max: 15.0 }
+          - { band: "Ba",  score: 5, min: 3.0,   max: 8.0 }
+          - { band: "B",   score: 6, min: 1.0,   max: 3.0 }
+          - { band: "Caa", score: 7, min: 0.25,  max: 1.0 }
+          - { band: "Ca",  score: 8, min: 0.0,   max: 0.25 }     # < $0.25
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 100.0   # $100bn or better => numeric 0.5
+          ca_endpoint_value: 0.0      # $0bn => numeric 20.5
+
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 15
+    subfactors:
+      - id: business_profile
+        name: Business Profile (qualitative)
+        metric: business_profile_band
+        weight_pct: 15
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1, description: "Extremely well diversified with several profitable global platforms that are market leaders in multiple continents." }
+          - { band: "Aa",  score: 2, description: "Well diversified with several profitable global platforms and strong market positions in multiple continents." }
+          - { band: "A",   score: 3, description: "A number of diversified segments, varying in size and profitability with just under half of revenues within one continent." }
+          - { band: "Baa", score: 4, description: "More than one balanced and profitable segment with the majority of revenues within one continent." }
+          - { band: "Ba",  score: 5, description: "Heavily reliant on one segment with the significant majority of revenues within one continent, but diversified across several economic regions." }
+          - { band: "B",   score: 6, description: "Heavily reliant on one segment with the significant majority of revenues within one continent and diversified across a few economic regions." }
+          - { band: "Caa", score: 7, description: "Heavily reliant on one segment and the significant majority of revenues expected to be within one economic region." }
+          - { band: "Ca",  score: 8, description: "One segment generates all revenues and all sales expected to be within one small economic region." }
+
+  - id: factor_3_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 15
+    subfactors:
+      - id: revenue_and_earnings_stability
+        name: Revenue and Earnings Stability (qualitative)
+        metric: revenue_earnings_stability_band
+        weight_pct: 15
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1, description: "Superior revenue, margin and backlog sustainability and technical capabilities that create very strong barriers to entry. Superior track record of project execution within scheduled time frame and established budget." }
+          - { band: "Aa",  score: 2, description: "Extremely high revenue, margin and backlog sustainability and technical capabilities that create very strong barriers to entry. Very strong track record of project execution within scheduled time frame and established budget." }
+          - { band: "A",   score: 3, description: "Very high revenue, margin and backlog sustainability and technical capabilities that create strong barriers to entry. Strong track record of project execution within scheduled time frame and established budget." }
+          - { band: "Baa", score: 4, description: "High revenue, margin and backlog sustainability and technical capabilities that create strong barriers to entry. Solid track record of project execution within scheduled time frame and established budget." }
+          - { band: "Ba",  score: 5, description: "Good revenue, margin and backlog sustainability and technical capabilities that create barriers to entry. Generally good track record of project execution within scheduled time frame and established budget." }
+          - { band: "B",   score: 6, description: "Moderate revenue, margin and backlog sustainability and technical capabilities that create modest barriers to entry. Moderate track record of project execution." }
+          - { band: "Caa", score: 7, description: "Volatile revenues, margins and backlog. Modest technical capabilities and limited competitive differentiation. Weak track record of project execution." }
+          - { band: "Ca",  score: 8, description: "Volatile and unpredictable revenues, margins and backlog with no competitive differentiation. Poor track record of project execution." }
+
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 30
+    subfactors:
+      - id: debt_ebitda
+        name: Debt / EBITDA
+        metric: debt_ebitda_x
+        weight_pct: 10
+        direction: lower_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 0.5 }        # <= 0.5x
+          - { band: "Aa",  score: 2, min: 0.5, max: 1.0 }
+          - { band: "A",   score: 3, min: 1.0, max: 1.5 }
+          - { band: "Baa", score: 4, min: 1.5, max: 2.5 }
+          - { band: "Ba",  score: 5, min: 2.5, max: 4.0 }
+          - { band: "B",   score: 6, min: 4.0, max: 6.0 }
+          - { band: "Caa", score: 7, min: 6.0, max: 8.5 }
+          - { band: "Ca",  score: 8, min: 8.5, max: null }      # > 8.5x
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 0.0     # 0x => numeric 0.5
+          ca_endpoint_value: 15.0     # 15x or worse => numeric 20.5
+        special_cases:
+          - when: { debt_ebitda_lt_0: true }
+            note: "Negative Debt/EBITDA => numeric 20.5 (worst)."
+            band: "Ca"
+            score: 8
+
+      - id: ebitda_interest
+        name: EBITDA / Interest Expense
+        metric: ebitda_interest_x
+        weight_pct: 10
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 30.0, max: null }      # >= 30x
+          - { band: "Aa",  score: 2, min: 20.0, max: 30.0 }
+          - { band: "A",   score: 3, min: 10.0, max: 20.0 }
+          - { band: "Baa", score: 4, min: 7.0,  max: 10.0 }
+          - { band: "Ba",  score: 5, min: 4.0,  max: 7.0 }
+          - { band: "B",   score: 6, min: 2.0,  max: 4.0 }
+          - { band: "Caa", score: 7, min: 1.0,  max: 2.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 1.0 }       # < 1x
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 40.0    # 40x or better => numeric 0.5
+          ca_endpoint_value: 0.0      # 0x or worse => numeric 20.5
+
+      - id: rcf_net_debt
+        name: RCF / Net Debt
+        metric: rcf_net_debt_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 70.0, max: null }      # >= 70%
+          - { band: "Aa",  score: 2, min: 50.0, max: 70.0 }
+          - { band: "A",   score: 3, min: 40.0, max: 50.0 }
+          - { band: "Baa", score: 4, min: 25.0, max: 40.0 }
+          - { band: "Ba",  score: 5, min: 15.0, max: 25.0 }
+          - { band: "B",   score: 6, min: 8.0,  max: 15.0 }
+          - { band: "Caa", score: 7, min: 1.0,  max: 8.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 1.0 }       # < 1%
+        endpoints_for_linear_scoring_if_net_debt_positive:
+          aaa_endpoint_value: 100.0   # 100% or better => numeric 0.5
+          ca_endpoint_value: 0.0      # 0% or worse => numeric 20.5
+        special_cases:
+          - when: { net_debt_lt_0: true, rcf_gt_0: true }
+            note: "Net debt negative and RCF positive => numeric 0.5 (best)."
+            band: "Aaa"
+            score: 1
+          - when: { net_debt_lt_0: true, rcf_lte_0: true }
+            note: "Net debt negative and RCF <= 0 => numeric 20.5 (worst)."
+            band: "Ca"
+            score: 8
+
+  - id: factor_5_financial_policy
+    name: Financial Policy
+    weight_pct: 20
+    subfactors:
+      - id: financial_policy
+        name: Financial Policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 20
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1, description: "Expected to have extremely conservative financial policies (including risk and liquidity management); very stable metrics; essentially no event risk that would cause a rating transition; and public commitment to a very strong credit profile over the long term." }
+          - { band: "Aa",  score: 2, description: "Expected to have very conservative financial policies (including risk and liquidity management); stable metrics; minimal event risk that would cause a rating transition; and public commitment to a strong credit profile over the long term." }
+          - { band: "A",   score: 3, description: "Expected to have predictable financial policies (including risk and liquidity management) that preserve creditor interests; although modest event risk exists, the effect on leverage is likely to be small and temporary; strong commitment to a solid credit profile." }
+          - { band: "Baa", score: 4, description: "Expected to have financial policies (including risk and liquidity management) that balance the interests of creditors and shareholders; some risk that debt-funded acquisitions or shareholder distributions could lead to a weaker credit profile." }
+          - { band: "Ba",  score: 5, description: "Expected to have financial policies (including risk and liquidity management) that tend to favor shareholders over creditors; above-average financial risk resulting from shareholder distributions, acquisitions or other significant capital structure changes." }
+          - { band: "B",   score: 6, description: "Expected to have financial policies (including risk and liquidity management) that favor shareholders over creditors; high financial risk resulting from shareholder distributions, acquisitions or other significant capital structure changes." }
+          - { band: "Caa", score: 7, description: "Expected to have financial policies (including risk and liquidity management) that create elevated risk of debt restructuring in varied economic environments." }
+          - { band: "Ca",  score: 8, description: "Expected to have financial policies (including risk and liquidity management) that create elevated risk of debt restructuring even in healthy economic environments." }

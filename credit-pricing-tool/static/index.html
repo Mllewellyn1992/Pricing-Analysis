@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Credit Pricing Tool | NZ Corporate Finance</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    .gradient-primary { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8c 100%); }
+    .card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-color: #d1d5db; }
+    .input-field { border: 1px solid #d1d5db; border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.9375rem; width: 100%; transition: all 0.2s; }
+    .input-field:focus { outline: none; border-color: #1e3a5f; box-shadow: 0 0 0 3px rgba(30,58,95,0.1); }
+    .btn-primary { background-color: #1e3a5f; color: white; padding: 0.625rem 1.25rem; border-radius: 6px; font-weight: 500; border: none; cursor: pointer; transition: all 0.2s; }
+    .btn-primary:hover { background-color: #2d5a8c; box-shadow: 0 4px 12px rgba(30,58,95,0.3); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background-color: #f3f4f6; color: #1e3a5f; padding: 0.625rem 1.25rem; border-radius: 6px; font-weight: 500; border: 1px solid #d1d5db; cursor: pointer; }
+    .btn-secondary:hover { background-color: #e5e7eb; border-color: #1e3a5f; }
+    .section-header { display: flex; align-items: center; gap: 0.75rem; padding: 1rem; background-color: #f9fafb; border-bottom: 1px solid #e5e7eb; cursor: pointer; user-select: none; }
+    .section-header:hover { background-color: #f3f4f6; }
+    .gauge-bg { background: linear-gradient(to right, #10b981, #fbbf24, #ef4444); height: 8px; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    const API = '';
+
+    // ── Sector mapping for the dropdown ──
+    const SECTORS = [
+      { id: 'technology_software_and_services', label: 'Technology / Software & Services' },
+      { id: 'building_materials', label: 'Building Materials' },
+      { id: 'mining', label: 'Mining' },
+      { id: 'regulated_utilities', label: 'Regulated Utilities' },
+      { id: 'retail_and_restaurants', label: 'Retail & Restaurants' },
+      { id: 'engineering_and_construction', label: 'Engineering & Construction' },
+      { id: 'pharmaceuticals', label: 'Pharmaceuticals' },
+      { id: 'aerospace_and_defense', label: 'Aerospace & Defense' },
+      { id: 'chemicals', label: 'Chemicals' },
+      { id: 'consumer_durables', label: 'Consumer Durables' },
+      { id: 'consumer_staples_and_branded_nondurables', label: 'Consumer Staples' },
+      { id: 'capital_goods', label: 'Capital Goods' },
+      { id: 'media_and_entertainment', label: 'Media & Entertainment' },
+      { id: 'health_care_services', label: 'Healthcare Services' },
+      { id: 'telecommunications', label: 'Telecommunications' },
+      { id: 'midstream_energy', label: 'Midstream Energy' },
+      { id: 'oil_and_gas_exploration_and_production', label: 'Oil & Gas E&P' },
+      { id: 'forest_and_paper_products', label: 'Forest & Paper Products' },
+      { id: 'homebuilders_and_real_estate_developers', label: 'Homebuilders & Real Estate' },
+      { id: 'business_and_consumer_services', label: 'Business & Consumer Services' },
+      { id: 'auto_and_commercial_vehicle_manufacturing', label: 'Automotive Manufacturing' },
+    ];
+
+    // ── Dashboard ──
+    function Dashboard({ onNavigate }) {
+      const [rates, setRates] = useState(null);
+
+      useEffect(() => {
+        fetch(`${API}/api/base-rates`)
+          .then(r => r.json())
+          .then(data => setRates(data))
+          .catch(() => {});
+      }, []);
+
+      const avgCorp = rates ? (() => { const cr = rates.filter(r=>r.corporate_rate!=null); return cr.length ? (cr.reduce((s,r)=>s+r.corporate_rate,0)/cr.length).toFixed(2) : 'N/A'; })() : '...';
+      const avgWC = rates ? (() => { const wc = rates.filter(r=>r.working_capital_rate!=null); return wc.length ? (wc.reduce((s,r)=>s+r.working_capital_rate,0)/wc.length).toFixed(2) : 'N/A'; })() : '...';
+
+      return (
+        <div className="p-8 max-w-6xl mx-auto">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
+          <p className="text-gray-500 mb-8">NZ Corporate Credit Pricing Intelligence</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="card p-6 card-hover cursor-pointer" onClick={() => onNavigate('#/analysis')}>
+              <div className="text-3xl mb-3">📋</div>
+              <h3 className="font-semibold text-lg text-gray-900">New Analysis</h3>
+              <p className="text-sm text-gray-500 mt-1">Enter financials and compare your borrowing rate against market expectations</p>
+            </div>
+            <div className="card p-6 card-hover cursor-pointer" onClick={() => onNavigate('#/upload')}>
+              <div className="text-3xl mb-3">📄</div>
+              <h3 className="font-semibold text-lg text-gray-900">Upload PDF</h3>
+              <p className="text-sm text-gray-500 mt-1">Extract financial data directly from annual reports and financial statements</p>
+            </div>
+            <div className="card p-6 card-hover cursor-pointer" onClick={() => onNavigate('#/rates')}>
+              <div className="text-3xl mb-3">💹</div>
+              <h3 className="font-semibold text-lg text-gray-900">Base Rates</h3>
+              <p className="text-sm text-gray-500 mt-1">View current NZ bank base rates across all major lenders</p>
+            </div>
+          </div>
+
+          <div className="card p-6">
+            <h2 className="font-semibold text-lg text-gray-900 mb-4">Market Snapshot</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 rounded-lg p-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Avg Corporate Rate</p>
+                <p className="text-2xl font-bold text-blue-800 mt-1">{avgCorp}%</p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Avg Working Capital</p>
+                <p className="text-2xl font-bold text-green-800 mt-1">{avgWC}%</p>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Banks Tracked</p>
+                <p className="text-2xl font-bold text-purple-800 mt-1">{rates ? rates.length : '...'}</p>
+              </div>
+              <div className="bg-orange-50 rounded-lg p-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Rating Engines</p>
+                <p className="text-2xl font-bold text-orange-800 mt-1">2</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Analysis Form ──
+    function AnalysisForm({ onResults }) {
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState(null);
+      const [sections, setSections] = useState({ company: true, income: true, balance: false, cashflow: false, facility: true });
+
+      const defaults = {
+        companyName: '', businessDescription: '', industry: 'building_materials',
+        revenue: '', ebit: '', depreciation: '', amortization: '',
+        interestExpense: '', cashInterestPaid: '', cashTaxesPaid: '',
+        totalDebt: '', stDebt: '', cpltd: '', ltDebt: '', capitalLeases: '',
+        cash: '', cashLikeAssets: '', totalEquity: '', minorityInterest: '', deferredTaxes: '',
+        nwcCurrent: '', nwcPrior: '', ltOperatingAssetsCurrent: '', ltOperatingAssetsPrior: '',
+        totalAssetsCurrent: '', totalAssetsPrior: '', avgCapital: '',
+        cfo: '', capex: '', commonDividends: '', preferredDividends: '', minorityDividends: '', sharebuybacks: '',
+        actualRate: '', tenor: '3', facilityType: 'corporate',
+      };
+      const [form, setForm] = useState(defaults);
+
+      const set = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+      const toggle = (s) => setSections(p => ({ ...p, [s]: !p[s] }));
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true); setError(null);
+        try {
+          const f = {};
+          for (const [k,v] of Object.entries(form)) f[k] = v;
+
+          // Build backend payload
+          const financials = {
+            revenue_mn: parseFloat(f.revenue) || 0, ebit_mn: parseFloat(f.ebit) || 0,
+            depreciation_mn: parseFloat(f.depreciation) || 0, amortization_mn: parseFloat(f.amortization) || 0,
+            interest_expense_mn: parseFloat(f.interestExpense) || 0,
+            cash_interest_paid_mn: parseFloat(f.cashInterestPaid) || 0,
+            cash_taxes_paid_mn: parseFloat(f.cashTaxesPaid) || 0,
+            total_debt_mn: parseFloat(f.totalDebt) || 0,
+            st_debt_mn: parseFloat(f.stDebt) || 0, cpltd_mn: parseFloat(f.cpltd) || 0,
+            lt_debt_net_mn: parseFloat(f.ltDebt) || 0, capital_leases_mn: parseFloat(f.capitalLeases) || 0,
+            cash_mn: parseFloat(f.cash) || 0, cash_like_mn: parseFloat(f.cashLikeAssets) || 0,
+            total_equity_mn: parseFloat(f.totalEquity) || 0,
+            minority_interest_mn: parseFloat(f.minorityInterest) || 0,
+            deferred_taxes_mn: parseFloat(f.deferredTaxes) || 0,
+            nwc_current_mn: parseFloat(f.nwcCurrent) || 0, nwc_prior_mn: parseFloat(f.nwcPrior) || 0,
+            lt_operating_assets_current_mn: parseFloat(f.ltOperatingAssetsCurrent) || 0,
+            lt_operating_assets_prior_mn: parseFloat(f.ltOperatingAssetsPrior) || 0,
+            assets_current_mn: parseFloat(f.totalAssetsCurrent) || 0,
+            assets_prior_mn: parseFloat(f.totalAssetsPrior) || 0,
+            cfo_mn: parseFloat(f.cfo) || 0, capex_mn: parseFloat(f.capex) || 0,
+            common_dividends_mn: parseFloat(f.commonDividends) || 0,
+            preferred_dividends_mn: parseFloat(f.preferredDividends) || 0,
+            minority_dividends_mn: parseFloat(f.minorityDividends) || 0,
+            dividends_paid_mn: parseFloat(f.commonDividends) || 0,
+            share_buybacks_mn: parseFloat(f.sharebuybacks) || 0,
+            avg_capital_mn: parseFloat(f.avgCapital) || parseFloat(f.totalEquity) || 0,
+          };
+          if (!financials.total_debt_mn && (financials.st_debt_mn || financials.lt_debt_net_mn)) {
+            financials.total_debt_mn = financials.st_debt_mn + financials.cpltd_mn + financials.lt_debt_net_mn + financials.capital_leases_mn;
+          }
+
+          const resp = await fetch(`${API}/api/pricing/full-analysis`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              financials,
+              sector_id: f.industry,
+              actual_rate_pct: parseFloat(f.actualRate) || 0,
+              facility_tenor: parseInt(f.tenor) || 3,
+              facility_type: f.facilityType,
+              base_rate_type: f.facilityType === 'working-capital' ? 'working_capital' : 'corporate',
+            }),
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || resp.statusText);
+          }
+          const data = await resp.json();
+
+          const ebitda = financials.ebit_mn + financials.depreciation_mn + financials.amortization_mn;
+          onResults({
+            companyName: f.companyName,
+            industry: f.industry,
+            ...data,
+            ebitda,
+            totalDebt: financials.total_debt_mn,
+            netDebt: financials.total_debt_mn - financials.cash_mn - financials.cash_like_mn,
+            debtToEbitda: ebitda > 0 ? financials.total_debt_mn / ebitda : 0,
+            ebitdaToInterest: financials.interest_expense_mn > 0 ? ebitda / financials.interest_expense_mn : 0,
+            revenue: financials.revenue_mn,
+          });
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const Input = ({ label, name, placeholder }) => (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+          <input type="text" name={name} value={form[name]} onChange={set} placeholder={placeholder || '0'} className="input-field" />
+        </div>
+      );
+
+      const Section = ({ title, id, children }) => (
+        <div className="card mb-6 overflow-hidden">
+          <button onClick={() => toggle(id)} className="section-header w-full" type="button">
+            <span style={{display:'inline-block',transition:'transform 0.2s',transform:sections[id]?'rotate(180deg)':'rotate(0)'}}>▼</span>
+            <h3 className="text-lg font-semibold text-gray-900 flex-1 text-left">{title}</h3>
+          </button>
+          {sections[id] && <div className="p-6 bg-white">{children}</div>}
+        </div>
+      );
+
+      return (
+        <div className="p-8 max-w-4xl mx-auto">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8">Credit Analysis</h1>
+          {error && <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>}
+
+          <form onSubmit={handleSubmit}>
+            <Section title="Company Information" id="company">
+              <div className="space-y-4">
+                <Input label="Company Name" name="companyName" placeholder="e.g., ABC Manufacturing Ltd" />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Business Description</label>
+                  <textarea name="businessDescription" value={form.businessDescription} onChange={set} rows="3" className="input-field" placeholder="Describe the company's operations..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Industry Sector</label>
+                  <select name="industry" value={form.industry} onChange={set} className="input-field">
+                    {SECTORS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  </select>
+                </div>
+              </div>
+            </Section>
+
+            <Section title="Income Statement (NZD millions)" id="income">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input label="Revenue" name="revenue" />
+                <Input label="EBIT" name="ebit" />
+                <Input label="Depreciation" name="depreciation" />
+                <Input label="Amortization" name="amortization" />
+                <Input label="Interest Expense" name="interestExpense" />
+                <Input label="Cash Interest Paid" name="cashInterestPaid" />
+                <Input label="Cash Taxes Paid" name="cashTaxesPaid" />
+              </div>
+            </Section>
+
+            <Section title="Balance Sheet (NZD millions)" id="balance">
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-sm font-medium text-gray-900 mb-3">Debt (enter total OR breakdown)</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="Total Debt" name="totalDebt" />
+                  <div className="flex items-end"><p className="text-xs text-gray-500">Or break down:</p></div>
+                  <Input label="Short-Term Debt" name="stDebt" />
+                  <Input label="Current Portion LT Debt" name="cpltd" />
+                  <Input label="Long-Term Debt" name="ltDebt" />
+                  <Input label="Capital Leases" name="capitalLeases" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input label="Cash" name="cash" />
+                <Input label="Cash-like Assets" name="cashLikeAssets" />
+                <Input label="Total Equity" name="totalEquity" />
+                <Input label="Minority Interest" name="minorityInterest" />
+                <Input label="Deferred Taxes" name="deferredTaxes" />
+                <Input label="Average Capital" name="avgCapital" />
+              </div>
+              <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded">
+                <p className="text-sm font-medium text-gray-900 mb-3">Working Capital & Assets</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="NWC (Current)" name="nwcCurrent" />
+                  <Input label="NWC (Prior Year)" name="nwcPrior" />
+                  <Input label="LT Operating Assets (Current)" name="ltOperatingAssetsCurrent" />
+                  <Input label="LT Operating Assets (Prior)" name="ltOperatingAssetsPrior" />
+                  <Input label="Total Assets (Current)" name="totalAssetsCurrent" />
+                  <Input label="Total Assets (Prior)" name="totalAssetsPrior" />
+                </div>
+              </div>
+            </Section>
+
+            <Section title="Cash Flow (NZD millions)" id="cashflow">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input label="Operating Cash Flow (CFO)" name="cfo" />
+                <Input label="Capital Expenditures" name="capex" />
+                <Input label="Common Dividends" name="commonDividends" />
+                <Input label="Preferred Dividends" name="preferredDividends" />
+                <Input label="Minority Dividends" name="minorityDividends" />
+                <Input label="Share Buybacks" name="sharebuybacks" />
+              </div>
+            </Section>
+
+            <Section title="Facility Details" id="facility">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Input label="Actual Interest Rate (%)" name="actualRate" placeholder="e.g., 7.5" />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tenor (Years)</label>
+                  <select name="tenor" value={form.tenor} onChange={set} className="input-field">
+                    {[1,2,3,4,5].map(y => <option key={y} value={y}>{y} year{y>1?'s':''}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Facility Type</label>
+                  <select name="facilityType" value={form.facilityType} onChange={set} className="input-field">
+                    <option value="corporate">Corporate Loan</option>
+                    <option value="working-capital">Working Capital</option>
+                  </select>
+                </div>
+              </div>
+            </Section>
+
+            <div className="flex gap-4 mt-6">
+              <button type="submit" disabled={loading} className="btn-primary flex-1 py-3 text-lg font-semibold">
+                {loading ? 'Analyzing...' : 'Calculate Expected Rate'}
+              </button>
+              <button type="button" className="btn-secondary px-8 py-3" onClick={() => setForm(defaults)}>Clear</button>
+            </div>
+          </form>
+
+          <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm text-gray-700"><span className="font-semibold text-green-700">All values in NZD millions.</span> Leave blank or enter 0 for N/A items.</p>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Results Page ──
+    function Results({ data, onNavigate }) {
+      if (!data) return (
+        <div className="p-8 text-center">
+          <p className="text-gray-500">No analysis results yet.</p>
+          <button onClick={() => onNavigate('#/analysis')} className="btn-primary mt-4">Run Analysis</button>
+        </div>
+      );
+
+      const deltaColor = data.delta_bps > 25 ? '#ef4444' : data.delta_bps < -25 ? '#10b981' : '#f59e0b';
+      const deltaLabel = data.delta_bps > 25 ? 'OVERPAYING' : data.delta_bps < -25 ? 'GOOD DEAL' : 'FAIR';
+
+      return (
+        <div className="p-8 max-w-5xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{data.companyName || 'Analysis Results'}</h1>
+              <p className="text-gray-500">{SECTORS.find(s=>s.id===data.industry)?.label || data.industry}</p>
+            </div>
+            <button onClick={() => onNavigate('#/analysis')} className="btn-secondary">New Analysis</button>
+          </div>
+
+          {/* Main Result Card */}
+          <div className="card p-8 mb-8" style={{borderLeft: `6px solid ${deltaColor}`}}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="text-center">
+                <p className="text-xs uppercase tracking-wide text-gray-500">Your Rate</p>
+                <p className="text-4xl font-bold text-gray-900 mt-2">{data.actual_rate_pct?.toFixed(2)}%</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs uppercase tracking-wide text-gray-500">Expected Range</p>
+                <p className="text-4xl font-bold mt-2" style={{color:'#1e3a5f'}}>
+                  {data.expected_rate_min?.toFixed(2)}% - {data.expected_rate_max?.toFixed(2)}%
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs uppercase tracking-wide text-gray-500">Delta</p>
+                <p className="text-4xl font-bold mt-2" style={{color: deltaColor}}>
+                  {data.delta_bps > 0 ? '+' : ''}{data.delta_bps?.toFixed(0)} bps
+                </p>
+                <span className="inline-block mt-2 px-3 py-1 rounded-full text-sm font-semibold text-white" style={{backgroundColor: deltaColor}}>
+                  {deltaLabel}
+                </span>
+              </div>
+            </div>
+            <p className="mt-6 text-gray-600 text-center">{data.interpretation}</p>
+          </div>
+
+          {/* Pricing Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="card p-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Pricing Breakdown</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between"><span className="text-gray-500">Base Rate</span><span className="font-medium">{data.base_rate_pct?.toFixed(2)}%</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Credit Spread (min-max)</span><span className="font-medium">{data.spread_min_bps?.toFixed(0)} - {data.spread_max_bps?.toFixed(0)} bps</span></div>
+                <div className="border-t pt-3 flex justify-between"><span className="font-semibold text-gray-900">Expected All-in Rate</span><span className="font-bold text-blue-800">{data.expected_rate_mid?.toFixed(2)}%</span></div>
+              </div>
+            </div>
+
+            <div className="card p-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Key Ratios</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between"><span className="text-gray-500">EBITDA</span><span className="font-medium">${data.ebitda?.toFixed(1)}m</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Total Debt</span><span className="font-medium">${data.totalDebt?.toFixed(1)}m</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Debt / EBITDA</span><span className="font-medium">{data.debtToEbitda?.toFixed(2)}x</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">EBITDA / Interest</span><span className="font-medium">{data.ebitdaToInterest?.toFixed(2)}x</span></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Visual gauge */}
+          <div className="card p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Rate Position</h3>
+            <div className="relative">
+              <div className="gauge-bg rounded-full"></div>
+              {data.expected_rate_min && data.expected_rate_max && (
+                <div className="mt-2 flex justify-between text-xs text-gray-400">
+                  <span>{(data.expected_rate_min - 1).toFixed(1)}%</span>
+                  <span className="font-medium text-green-600">Expected: {data.expected_rate_min.toFixed(2)}-{data.expected_rate_max.toFixed(2)}%</span>
+                  <span>{(data.expected_rate_max + 2).toFixed(1)}%</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Base Rates Page ──
+    function BaseRates() {
+      const [view, setView] = useState('products'); // 'summary' or 'products'
+      const [rates, setRates] = useState(null);
+      const [products, setProducts] = useState(null);
+      const [ocr, setOcr] = useState(null);
+      const [bankFilter, setBankFilter] = useState('');
+      const [loading, setLoading] = useState(true);
+      const [refreshing, setRefreshing] = useState(false);
+
+      useEffect(() => {
+        Promise.all([
+          fetch(`${API}/api/base-rates`).then(r => r.json()),
+          fetch(`${API}/api/rates/products`).then(r => r.json()),
+          fetch(`${API}/api/rates/ocr`).then(r => r.json()).catch(() => null),
+        ]).then(([ratesData, productsData, ocrData]) => {
+          setRates(ratesData);
+          setProducts(productsData);
+          setOcr(ocrData);
+          setLoading(false);
+        }).catch(() => setLoading(false));
+      }, []);
+
+      const handleRefresh = () => {
+        setRefreshing(true);
+        fetch(`${API}/api/rates/products/refresh`)
+          .then(r => r.json())
+          .then(() => {
+            return Promise.all([
+              fetch(`${API}/api/rates/products`).then(r => r.json()),
+              fetch(`${API}/api/rates/ocr`).then(r => r.json()).catch(() => null),
+            ]);
+          })
+          .then(([productsData, ocrData]) => {
+            setProducts(productsData);
+            setOcr(ocrData);
+            setRefreshing(false);
+          })
+          .catch(() => setRefreshing(false));
+      };
+
+      if (loading) return <div className="p-8"><p className="text-gray-500">Loading rates...</p></div>;
+
+      // Group products by bank
+      const byBank = {};
+      (products || []).forEach(p => {
+        if (!byBank[p.bank]) byBank[p.bank] = [];
+        byBank[p.bank].push(p);
+      });
+      const bankNames = Object.keys(byBank).sort();
+      const filteredBanks = bankFilter ? bankNames.filter(b => b === bankFilter) : bankNames;
+
+      // Category colors
+      const catColor = (cat) => {
+        const colors = {
+          corporate: 'text-blue-700', business_lending: 'text-gray-800', working_capital: 'text-green-700',
+          overdraft: 'text-orange-700', rural: 'text-emerald-700', housing: 'text-purple-700',
+          revolving_credit: 'text-teal-700', invoice_finance: 'text-cyan-700',
+        };
+        return colors[cat] || 'text-gray-700';
+      };
+      const catBg = (cat) => {
+        const colors = {
+          corporate: 'bg-blue-50 text-blue-700', business_lending: 'bg-gray-50 text-gray-700', working_capital: 'bg-green-50 text-green-700',
+          overdraft: 'bg-orange-50 text-orange-700', rural: 'bg-emerald-50 text-emerald-700', housing: 'bg-purple-50 text-purple-700',
+          revolving_credit: 'bg-teal-50 text-teal-700', invoice_finance: 'bg-cyan-50 text-cyan-700',
+        };
+        return colors[cat] || 'bg-gray-50 text-gray-700';
+      };
+
+      return (
+        <div className="p-8 max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl font-bold text-gray-900">NZ Bank Base Rates</h1>
+            <button onClick={handleRefresh} disabled={refreshing} className="btn-secondary text-sm">
+              {refreshing ? 'Refreshing...' : 'Refresh All'}
+            </button>
+          </div>
+          <p className="text-gray-500 mb-6">Live rates from ASB API, BNZ, interest.co.nz, and RBNZ</p>
+
+          {/* OCR + Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="card p-4 text-center">
+              <p className="text-xs uppercase text-gray-500">OCR (RBNZ)</p>
+              <p className="text-2xl font-bold text-red-700">{ocr ? ocr.rate_pct.toFixed(2) + '%' : 'N/A'}</p>
+              {ocr && <p className="text-xs text-gray-400 mt-1">as at {ocr.decision_date}</p>}
+            </div>
+            {rates && (() => { const cr = rates.filter(r=>r.corporate_rate!=null); return (
+              <div className="card p-4 text-center">
+                <p className="text-xs uppercase text-gray-500">Avg Corporate</p>
+                <p className="text-2xl font-bold text-blue-800">{cr.length ? (cr.reduce((s,r)=>s+r.corporate_rate,0)/cr.length).toFixed(2) + '%' : 'N/A'}</p>
+              </div>
+            ); })()}
+            {rates && (() => { const wc = rates.filter(r=>r.working_capital_rate!=null); return (
+              <div className="card p-4 text-center">
+                <p className="text-xs uppercase text-gray-500">Avg Working Capital</p>
+                <p className="text-2xl font-bold text-green-800">{wc.length ? (wc.reduce((s,r)=>s+r.working_capital_rate,0)/wc.length).toFixed(2) + '%' : 'N/A'}</p>
+              </div>
+            ); })()}
+            <div className="card p-4 text-center">
+              <p className="text-xs uppercase text-gray-500">Products Tracked</p>
+              <p className="text-2xl font-bold text-gray-800">{(products || []).length}</p>
+              <p className="text-xs text-gray-400 mt-1">{bankNames.length} institutions</p>
+            </div>
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex gap-2 mb-4">
+            <button onClick={() => setView('products')} className={view === 'products' ? 'btn-primary text-sm' : 'btn-secondary text-sm'}>
+              All Products
+            </button>
+            <button onClick={() => setView('summary')} className={view === 'summary' ? 'btn-primary text-sm' : 'btn-secondary text-sm'}>
+              Summary View
+            </button>
+            {view === 'products' && (
+              <select value={bankFilter} onChange={e => setBankFilter(e.target.value)}
+                className="input-field text-sm" style={{width: 'auto', marginLeft: '0.5rem'}}>
+                <option value="">All Banks</option>
+                {bankNames.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            )}
+          </div>
+
+          {/* Summary View (legacy) */}
+          {view === 'summary' && (
+            <div className="card overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Bank</th>
+                    <th className="text-right py-3 px-6 text-sm font-semibold text-gray-700">Corporate Rate</th>
+                    <th className="text-right py-3 px-6 text-sm font-semibold text-gray-700">Working Capital</th>
+                    <th className="text-right py-3 px-6 text-sm font-semibold text-gray-700">Overdraft</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rates && rates.map((r, i) => (
+                    <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-6 font-medium text-gray-900">{r.bank}</td>
+                      <td className="py-3 px-6 text-right text-blue-700 font-semibold">{r.corporate_rate != null ? r.corporate_rate.toFixed(2) + '%' : '-'}</td>
+                      <td className="py-3 px-6 text-right text-green-700 font-semibold">{r.working_capital_rate != null ? r.working_capital_rate.toFixed(2) + '%' : '-'}</td>
+                      <td className="py-3 px-6 text-right text-orange-700 font-semibold">{r.overdraft_rate != null ? r.overdraft_rate.toFixed(2) + '%' : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Products View (new granular) */}
+          {view === 'products' && (
+            <div className="space-y-4">
+              {filteredBanks.map(bank => (
+                <div key={bank} className="card overflow-hidden">
+                  <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                    <h3 className="font-semibold text-gray-900">{bank} <span className="text-sm font-normal text-gray-500">({byBank[bank].length} products)</span></h3>
+                  </div>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-xs text-gray-500 uppercase">
+                        <th className="text-left py-2 px-6">Product</th>
+                        <th className="text-right py-2 px-6">Base Rate</th>
+                        <th className="text-left py-2 px-6">Category</th>
+                        <th className="text-left py-2 px-6">Source</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {byBank[bank].sort((a,b) => a.rate_pct - b.rate_pct).map((p, i) => (
+                        <tr key={i} className="border-t border-gray-50 hover:bg-gray-50">
+                          <td className="py-2.5 px-6 text-sm font-medium text-gray-900">{p.product_name}</td>
+                          <td className={`py-2.5 px-6 text-right text-sm font-bold ${catColor(p.category)}`}>{p.rate_pct.toFixed(2)}%</td>
+                          <td className="py-2.5 px-6">
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${catBg(p.category)}`}>
+                              {p.category.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-6 text-xs text-gray-400">{p.source_url ? new URL(p.source_url).hostname : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ── Upload Page ──
+    function Upload({ onNavigate }) {
+      const [file, setFile] = useState(null);
+      const [uploading, setUploading] = useState(false);
+      const [result, setResult] = useState(null);
+
+      const handleUpload = async () => {
+        if (!file) return;
+        setUploading(true);
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          const resp = await fetch(`${API}/api/extract/pdf`, { method: 'POST', body: fd });
+          const data = await resp.json();
+          setResult(data);
+        } catch (err) {
+          setResult({ error: err.message });
+        } finally {
+          setUploading(false);
+        }
+      };
+
+      return (
+        <div className="p-8 max-w-4xl mx-auto">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8">Upload Financial Statements</h1>
+
+          <div className="card p-8 text-center">
+            <div className="text-5xl mb-4">📄</div>
+            <p className="text-lg text-gray-700 mb-4">Upload a PDF financial statement to extract data automatically</p>
+            <input type="file" accept=".pdf" onChange={e => setFile(e.target.files[0])} className="mb-4" />
+            {file && <p className="text-sm text-gray-500 mb-4">Selected: {file.name}</p>}
+            <button onClick={handleUpload} disabled={!file || uploading} className="btn-primary px-8 py-3">
+              {uploading ? 'Extracting...' : 'Extract Financial Data'}
+            </button>
+          </div>
+
+          {result && (
+            <div className="card p-6 mt-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Extraction Results</h3>
+              {result.error ? (
+                <p className="text-red-600">{result.error}</p>
+              ) : (
+                <div>
+                  <p className="text-sm text-gray-500 mb-2">Status: {result.status || 'complete'}</p>
+                  <pre className="bg-gray-50 p-4 rounded text-sm overflow-auto max-h-64">{JSON.stringify(result, null, 2)}</pre>
+                  {result.extracted_fields && Object.keys(result.extracted_fields).length > 0 && (
+                    <button onClick={() => onNavigate('#/analysis')} className="btn-primary mt-4">Use in Analysis</button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ── Main App ──
+    function App() {
+      const [hash, setHash] = useState(window.location.hash || '#/');
+      const [results, setResults] = useState(null);
+
+      useEffect(() => {
+        const handler = () => setHash(window.location.hash || '#/');
+        window.addEventListener('hashchange', handler);
+        return () => window.removeEventListener('hashchange', handler);
+      }, []);
+
+      const nav = (path) => { window.location.hash = path; setHash(path); };
+      const handleResults = (data) => { setResults(data); nav('#/results'); };
+
+      const page = hash.replace('#/', '') || '';
+      const renderPage = () => {
+        switch(page) {
+          case '': return <Dashboard onNavigate={nav} />;
+          case 'analysis': return <AnalysisForm onResults={handleResults} />;
+          case 'results': return <Results data={results} onNavigate={nav} />;
+          case 'rates': return <BaseRates onNavigate={nav} />;
+          case 'upload': return <Upload onNavigate={nav} />;
+          default: return <Dashboard onNavigate={nav} />;
+        }
+      };
+
+      return (
+        <div className="flex h-screen bg-gray-50">
+          <aside className="w-64 gradient-primary text-white shadow-lg flex flex-col">
+            <div className="p-6 border-b border-blue-700">
+              <h1 className="text-xl font-bold">Credit Pricing</h1>
+              <p className="text-blue-200 text-sm mt-1">NZ Corporate Finance</p>
+            </div>
+            <nav className="p-4 space-y-2 flex-1">
+              {[
+                { href: '#/', label: 'Dashboard', icon: '\u{1F4CA}' },
+                { href: '#/analysis', label: 'Analysis', icon: '\u{1F4CB}' },
+                { href: '#/upload', label: 'Upload PDF', icon: '\u{1F4C4}' },
+                { href: '#/rates', label: 'Base Rates', icon: '\u{1F4B9}' },
+              ].map(item => (
+                <button key={item.href} onClick={() => nav(item.href)}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                    hash === item.href ? 'bg-blue-700 text-white' : 'text-blue-100 hover:bg-blue-600'
+                  }`}>
+                  <span className="mr-3">{item.icon}</span>{item.label}
+                </button>
+              ))}
+            </nav>
+            <div className="p-4 border-t border-blue-700">
+              <p className="text-blue-300 text-xs">v1.0 • Dual-Engine Credit Pricing</p>
+            </div>
+          </aside>
+          <main className="flex-1 overflow-auto">{renderPage()}</main>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

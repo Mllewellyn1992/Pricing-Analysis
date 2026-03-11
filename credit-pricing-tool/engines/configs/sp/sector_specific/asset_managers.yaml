@@ -1,0 +1,63 @@
+id: asset_managers
+name: Asset Managers
+version: 1
+volatility_preference: standard
+factors:
+- id: competitive_position
+  name: Competitive Position
+  weight_pct: 100
+  subfactors:
+  - id: competitive_advantage
+    name: Competitive advantage
+    metric: competitive_advantage_band
+    weight_pct: 34
+    direction: qualitative
+    grid:
+    - band: '1'
+      score: 1
+    - band: '2'
+      score: 2
+    - band: '3'
+      score: 3
+    - band: '4'
+      score: 4
+    - band: '5'
+      score: 5
+    - band: '6'
+      score: 6
+  - id: scale_scope_diversity
+    name: Scale, scope, and diversity
+    metric: scale_scope_diversity_band
+    weight_pct: 33
+    direction: qualitative
+    grid:
+    - band: '1'
+      score: 1
+    - band: '2'
+      score: 2
+    - band: '3'
+      score: 3
+    - band: '4'
+      score: 4
+    - band: '5'
+      score: 5
+    - band: '6'
+      score: 6
+  - id: operating_efficiency
+    name: Operating efficiency
+    metric: operating_efficiency_band
+    weight_pct: 33
+    direction: qualitative
+    grid:
+    - band: '1'
+      score: 1
+    - band: '2'
+      score: 2
+    - band: '3'
+      score: 3
+    - band: '4'
+      score: 4
+    - band: '5'
+      score: 5
+    - band: '6'
+      score: 6

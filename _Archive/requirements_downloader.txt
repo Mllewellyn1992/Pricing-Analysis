@@ -1,0 +1,5 @@
+# Minimal deps for the Moody's methodology *browser-driven* downloader
+openpyxl==3.1.5
+playwright==1.49.1
+
+

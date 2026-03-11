@@ -1,0 +1,163 @@
+id: automobile_manufacturers
+name: Automobile Manufacturers
+version: "10 Oct 2025"
+
+factors:
+  - id: factor_1_business_profile
+    name: Business Profile
+    weight_pct: 40
+    subfactors:
+      - id: trend_global_market_share
+        name: Trend in Global Market Share (units) – 3yr change (pp)
+        metric: market_share_change_pp
+        weight_pct: 10
+        direction: higher_better
+        units: percentage_points
+        notes:
+          - "This metric is scored discretely (no linear interpolation)."
+          - "Thresholds are expressed as percentage-point change in global market share over the last 3 years."
+        grid:
+          - { band: "Aaa", score: 1,  min: 2.0,   max: null }   # Increase > 2%
+          - { band: "Aa",  score: 2,  min: 1.0,   max: 2.0 }    # Increase > 1%
+          - { band: "A",   score: 3,  min: 0.25,  max: 1.0 }    # Increase > 0.25%
+          - { band: "Baa", score: 4,  min: -0.25, max: 0.25 }   # ~flat (approx. -0.25% to +0.25%)
+          - { band: "Ba",  score: 5,  min: -2.0,  max: -0.25 }  # Decrease > 0.25%
+          - { band: "B",   score: 6,  min: -3.0,  max: -2.0 }   # Decrease > 2%
+          - { band: "Caa", score: 7,  min: -4.0,  max: -3.0 }   # Decrease > 3%
+          - { band: "Ca",  score: 8,  min: null,  max: -4.0 }   # Decrease > 4%
+
+      - id: market_position_product_portfolio
+        name: Market Position and Product Portfolio (qualitative)
+        metric: market_position_band
+        weight_pct: 30
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1 }
+          - { band: "Aa",  score: 2 }
+          - { band: "A",   score: 3 }
+          - { band: "Baa", score: 4 }
+          - { band: "Ba",  score: 5 }
+          - { band: "B",   score: 6 }
+          - { band: "Caa", score: 7 }
+          - { band: "Ca",  score: 8 }
+
+  - id: factor_2_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 20
+    subfactors:
+      - id: ebit_margin
+        name: EBIT Margin
+        metric: ebit_margin_pct
+        weight_pct: 20
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1,  min: 20.0, max: null }     # > 20% (linear endpoint 40%)
+          - { band: "Aa",  score: 2,  min: 15.0, max: 20.0 }
+          - { band: "A",   score: 3,  min: 10.0, max: 15.0 }
+          - { band: "Baa", score: 4,  min: 7.0,  max: 10.0 }
+          - { band: "Ba",  score: 5,  min: 4.0,  max: 7.0 }
+          - { band: "B",   score: 6,  min: 1.0,  max: 4.0 }
+          - { band: "Caa", score: 7,  min: 0.5,  max: 1.0 }
+          - { band: "Ca",  score: 8,  min: null, max: 0.5 }      # < 0.5%
+
+  - id: factor_3_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 25
+    subfactors:
+      - id: debt_ebitda
+        name: Debt / EBITDA
+        metric: debt_ebitda_x
+        weight_pct: 10
+        direction: lower_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1,  min: 0.0, max: 0.5 }       # < 0.5x (linear endpoint 0x)
+          - { band: "Aa",  score: 2,  min: 0.5, max: 1.5 }
+          - { band: "A",   score: 3,  min: 1.5, max: 2.5 }
+          - { band: "Baa", score: 4,  min: 2.5, max: 3.5 }
+          - { band: "Ba",  score: 5,  min: 3.5, max: 4.5 }
+          - { band: "B",   score: 6,  min: 4.5, max: 6.0 }
+          - { band: "Caa", score: 7,  min: 6.0, max: 9.0 }
+          - { band: "Ca",  score: 8,  min: 9.0, max: null }     # > 9x
+        special_cases:
+          - when: { total_debt: 0 }
+            band: "Aaa"
+            score: 1
+            note: "When debt is zero, treat as best (Aaa)."
+          - when: { total_debt_gt_0: true, ebitda_lte_0: true }
+            band: "Ca"
+            score: 8
+            note: "When debt is positive and EBITDA is zero/negative, treat as worst (Ca)."
+
+      - id: ebit_interest
+        name: EBIT / Interest Expense
+        metric: ebit_interest_x
+        weight_pct: 5
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1,  min: 25.0, max: null }     # > 25x (linear endpoint 40x)
+          - { band: "Aa",  score: 2,  min: 15.0, max: 25.0 }
+          - { band: "A",   score: 3,  min: 10.0, max: 15.0 }
+          - { band: "Baa", score: 4,  min: 5.0,  max: 10.0 }
+          - { band: "Ba",  score: 5,  min: 2.0,  max: 5.0 }
+          - { band: "B",   score: 6,  min: 1.0,  max: 2.0 }
+          - { band: "Caa", score: 7,  min: 0.5,  max: 1.0 }
+          - { band: "Ca",  score: 8,  min: null, max: 0.5 }      # < 0.5x
+        special_cases:
+          - when: { interest_expense_lte_0: true }
+            band: "Aaa"
+            score: 1
+            note: "If interest expense is zero/negative, treat as best."
+
+      - id: rcf_debt
+        name: RCF / Debt
+        metric: rcf_debt_pct
+        weight_pct: 5
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1,  min: 100.0, max: null }    # > 100% (linear endpoint 140%)
+          - { band: "Aa",  score: 2,  min: 75.0,  max: 100.0 }
+          - { band: "A",   score: 3,  min: 50.0,  max: 75.0 }
+          - { band: "Baa", score: 4,  min: 30.0,  max: 50.0 }
+          - { band: "Ba",  score: 5,  min: 20.0,  max: 30.0 }
+          - { band: "B",   score: 6,  min: 10.0,  max: 20.0 }
+          - { band: "Caa", score: 7,  min: 5.0,   max: 10.0 }
+          - { band: "Ca",  score: 8,  min: null,  max: 5.0 }     # < 5%
+
+      - id: fcf_debt
+        name: FCF / Debt
+        metric: fcf_debt_pct
+        weight_pct: 5
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1,  min: 45.0, max: null }     # > 45% (linear endpoint 100%)
+          - { band: "Aa",  score: 2,  min: 30.0, max: 45.0 }
+          - { band: "A",   score: 3,  min: 20.0, max: 30.0 }
+          - { band: "Baa", score: 4,  min: 10.0, max: 20.0 }
+          - { band: "Ba",  score: 5,  min: 5.0,  max: 10.0 }
+          - { band: "B",   score: 6,  min: 0.0,  max: 5.0 }
+          - { band: "Caa", score: 7,  min: -5.0, max: 0.0 }
+          - { band: "Ca",  score: 8,  min: null, max: -5.0 }     # < -5%
+
+  - id: factor_4_financial_policy
+    name: Financial Policy
+    weight_pct: 15
+    subfactors:
+      - id: financial_policy
+        name: Financial Policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 15
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1 }
+          - { band: "Aa",  score: 2 }
+          - { band: "A",   score: 3 }
+          - { band: "Baa", score: 4 }
+          - { band: "Ba",  score: 5 }
+          - { band: "B",   score: 6 }
+          - { band: "Caa", score: 7 }
+          - { band: "Ca",  score: 8 }

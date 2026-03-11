@@ -1,0 +1,451 @@
+id: soft_beverages
+name: Soft Beverages
+version: 2 Sep 2025
+factors:
+- id: factor_1_scale
+  name: Scale
+  weight_pct: 16
+  subfactors:
+  - id: revenue
+    name: Revenue (USD Billion)
+    metric: revenue_usd_billion
+    weight_pct: 16
+    direction: higher_better
+    units: USD_billion
+    grid:
+    - band: Aaa
+      score: 1
+      min: 70.0
+      max: null
+    - band: Aa
+      score: 2
+      min: 30.0
+      max: 70.0
+    - band: A
+      score: 3
+      min: 10.0
+      max: 30.0
+    - band: Baa
+      score: 4
+      min: 4.0
+      max: 10.0
+    - band: Ba
+      score: 5
+      min: 2.0
+      max: 4.0
+    - band: B
+      score: 6
+      min: 0.5
+      max: 2.0
+    - band: Caa
+      score: 7
+      min: 0.25
+      max: 0.5
+    - band: Ca
+      score: 8
+      min: 0.0
+      max: 0.25
+    endpoints_for_linear_scoring:
+      aaa_endpoint_value: 120.0
+      ca_endpoint_value: 0.0
+      note: Aaa endpoint $120bn; Ca endpoint $0bn. $120bn+ => numeric score 0.5; $0bn => 20.5.
+- id: factor_2_business_profile
+  name: Business Profile
+  weight_pct: 40
+  subfactors:
+  - id: product_diversification
+    name: Product Diversification (qualitative)
+    metric: product_diversification_band
+    weight_pct: 8
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+  - id: geographic_characteristics
+    name: Geographic Characteristics (qualitative)
+    metric: geographic_characteristics_band
+    weight_pct: 8
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+  - id: market_position_brand_strength
+    name: Market Position and Brand Strength (qualitative)
+    metric: market_position_brand_strength_band
+    weight_pct: 8
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+  - id: innovation_distribution_infrastructure
+    name: Innovation, Distribution and Infrastructure (qualitative)
+    metric: innovation_distribution_infrastructure_band
+    weight_pct: 8
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+  - id: pricing_flexibility
+    name: Pricing Flexibility (qualitative)
+    metric: pricing_flexibility_band
+    weight_pct: 8
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+- id: factor_3_financial_policy
+  name: Financial Policy
+  weight_pct: 16
+  subfactors:
+  - id: financial_policy
+    name: Financial Policy (qualitative)
+    metric: financial_policy_band
+    weight_pct: 16
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+- id: factor_4_profitability
+  name: Profitability
+  weight_pct: 7
+  subfactors:
+  - id: ebita_margin
+    name: EBITA Margin
+    metric: ebita_margin_pct
+    weight_pct: 7
+    direction: higher_better
+    units: percent
+    grid:
+    - band: Aaa
+      score: 1
+      min: 25.0
+      max: null
+    - band: Aa
+      score: 2
+      min: 20.0
+      max: 25.0
+    - band: A
+      score: 3
+      min: 15.0
+      max: 20.0
+    - band: Baa
+      score: 4
+      min: 10.0
+      max: 15.0
+    - band: Ba
+      score: 5
+      min: 7.0
+      max: 10.0
+    - band: B
+      score: 6
+      min: 4.0
+      max: 7.0
+    - band: Caa
+      score: 7
+      min: 1.0
+      max: 4.0
+    - band: Ca
+      score: 8
+      min: -1000000000.0
+      max: 1.0
+    endpoints_for_linear_scoring:
+      aaa_endpoint_value: 40.0
+      ca_endpoint_value: 0.0
+      note: Aaa endpoint 40%; 40%+ => numeric score 0.5. Ca endpoint 0%; 0% or worse => 20.5.
+- id: factor_5_leverage_coverage
+  name: Leverage and Coverage
+  weight_pct: 21
+  subfactors:
+  - id: rcf_net_debt
+    name: RCF / Net Debt
+    metric: rcf_net_debt_pct
+    weight_pct: 7
+    direction: higher_better
+    units: percent
+    grid:
+    - band: Aaa
+      score: 1
+      min: 70.0
+      max: null
+    - band: Aa
+      score: 2
+      min: 50.0
+      max: 70.0
+    - band: A
+      score: 3
+      min: 35.0
+      max: 50.0
+    - band: Baa
+      score: 4
+      min: 20.0
+      max: 35.0
+    - band: Ba
+      score: 5
+      min: 15.0
+      max: 20.0
+    - band: B
+      score: 6
+      min: 8.0
+      max: 15.0
+    - band: Caa
+      score: 7
+      min: 0.0
+      max: 8.0
+    - band: Ca
+      score: 8
+      min: -1000000000.0
+      max: 0.0
+    endpoints_for_linear_scoring:
+      aaa_endpoint_value_when_net_debt_positive: 100.0
+      ca_endpoint_value_when_net_debt_positive: -5.0
+      note: 'When net debt positive: Aaa endpoint 100% (100%+ => 0.5); Ca endpoint -5% (-5% or worse => 20.5). When net debt negative: if RCF
+        positive => 0.5; if RCF <=0 => 19.5.'
+  - id: ebit_interest
+    name: EBIT / Interest Expense
+    metric: ebit_interest_x
+    weight_pct: 7
+    direction: higher_better
+    units: times
+    grid:
+    - band: Aaa
+      score: 1
+      min: 16.0
+      max: null
+    - band: Aa
+      score: 2
+      min: 11.0
+      max: 16.0
+    - band: A
+      score: 3
+      min: 6.0
+      max: 11.0
+    - band: Baa
+      score: 4
+      min: 3.5
+      max: 6.0
+    - band: Ba
+      score: 5
+      min: 2.0
+      max: 3.5
+    - band: B
+      score: 6
+      min: 1.0
+      max: 2.0
+    - band: Caa
+      score: 7
+      min: 0.5
+      max: 1.0
+    - band: Ca
+      score: 8
+      min: -1000000000.0
+      max: 0.5
+    endpoints_for_linear_scoring:
+      aaa_endpoint_value: 30.0
+      ca_endpoint_value: 0.0
+      note: Aaa endpoint 30x (30x+ => 0.5). Ca endpoint 0x (0x or worse => 20.5).
+  - id: debt_ebitda
+    name: Debt / EBITDA
+    metric: debt_ebitda_x
+    weight_pct: 7
+    direction: lower_better
+    units: times
+    grid:
+    - band: Aaa
+      score: 1
+      min: 0.0
+      max: 0.5
+    - band: Aa
+      score: 2
+      min: 0.5
+      max: 1.3
+    - band: A
+      score: 3
+      min: 1.3
+      max: 2.3
+    - band: Baa
+      score: 4
+      min: 2.3
+      max: 3.3
+    - band: Ba
+      score: 5
+      min: 3.3
+      max: 4.3
+    - band: B
+      score: 6
+      min: 4.3
+      max: 6.3
+    - band: Caa
+      score: 7
+      min: 6.3
+      max: 10.0
+    - band: Ca
+      score: 8
+      min: 10.0
+      max: null
+    endpoints_for_linear_scoring:
+      aaa_endpoint_value: 0.0
+      ca_endpoint_value: 12.0
+      note: Aaa endpoint 0x (0x => 0.5). Ca endpoint 12x (12x or worse => 20.5). Negative Debt/EBITDA also => 20.5.
+notching_factors:
+- id: bottler_support
+  name: Bottler Support
+  applies_to: bottlers_only
+  options:
+  - id: no_lift
+    name: No lift
+    notches: 0
+  - id: one_notch
+    name: One notch of lift
+    notches: 1
+  - id: two_or_more
+    name: Two or more notches
+    notches: 2
+  notes: Use Moody's Bottler Support key considerations table to select the option.
+score_to_rating:
+- min_score: 0.0
+  max_score: 1.5
+  rating: Aaa
+- min_score: 1.5
+  max_score: 2.5
+  rating: Aa1
+- min_score: 2.5
+  max_score: 3.5
+  rating: Aa2
+- min_score: 3.5
+  max_score: 4.5
+  rating: Aa3
+- min_score: 4.5
+  max_score: 5.5
+  rating: A1
+- min_score: 5.5
+  max_score: 6.5
+  rating: A2
+- min_score: 6.5
+  max_score: 7.5
+  rating: A3
+- min_score: 7.5
+  max_score: 8.5
+  rating: Baa1
+- min_score: 8.5
+  max_score: 9.5
+  rating: Baa2
+- min_score: 9.5
+  max_score: 10.5
+  rating: Baa3
+- min_score: 10.5
+  max_score: 11.5
+  rating: Ba1
+- min_score: 11.5
+  max_score: 12.5
+  rating: Ba2
+- min_score: 12.5
+  max_score: 13.5
+  rating: Ba3
+- min_score: 13.5
+  max_score: 14.5
+  rating: B1
+- min_score: 14.5
+  max_score: 15.5
+  rating: B2
+- min_score: 15.5
+  max_score: 16.5
+  rating: B3
+- min_score: 16.5
+  max_score: 17.5
+  rating: Caa1
+- min_score: 17.5
+  max_score: 18.5
+  rating: Caa2
+- min_score: 18.5
+  max_score: 19.5
+  rating: Caa3
+- min_score: 19.5
+  max_score: 20.5
+  rating: Ca
+- min_score: 20.5
+  max_score: 99.9
+  rating: C

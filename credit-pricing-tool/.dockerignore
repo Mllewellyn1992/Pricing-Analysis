@@ -1,0 +1,8 @@
+node_modules
+frontend/node_modules
+__pycache__
+.env
+.rate_cache.json
+.rate_history.json
+.git
+*.pyc

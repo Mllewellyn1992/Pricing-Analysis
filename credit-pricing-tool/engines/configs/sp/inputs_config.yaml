@@ -1,0 +1,214 @@
+sections:
+  - title: Core inputs
+    fields:
+      - id: base_year
+        label: Latest financial year
+        type: number
+  - title: Industry risk inputs
+    fields:
+      - id: cyclicality_score
+        label: Cyclicality assessment (1-6)
+        type: select
+        options:
+          - { id: "1", label: "1 (Very low risk)" }
+          - { id: "2", label: "2 (Low risk)" }
+          - { id: "3", label: "3 (Intermediate risk)" }
+          - { id: "4", label: "4 (Moderately high risk)" }
+          - { id: "5", label: "5 (High risk)" }
+          - { id: "6", label: "6 (Very high risk)" }
+      - id: competitive_risk_score
+        label: Competitive risk and growth assessment (1-6)
+        type: select
+        options:
+          - { id: "1", label: "1 (Very low risk)" }
+          - { id: "2", label: "2 (Low risk)" }
+          - { id: "3", label: "3 (Intermediate risk)" }
+          - { id: "4", label: "4 (Moderately high risk)" }
+          - { id: "5", label: "5 (High risk)" }
+          - { id: "6", label: "6 (Very high risk)" }
+  - title: Country risk inputs
+    fields:
+      - id: country_risk_score
+        label: Country risk assessment (1-6)
+        type: select
+        options:
+          - { id: "1", label: "1 (Very low risk)" }
+          - { id: "2", label: "2 (Low risk)" }
+          - { id: "3", label: "3 (Intermediate risk)" }
+          - { id: "4", label: "4 (Moderately high risk)" }
+          - { id: "5", label: "5 (High risk)" }
+          - { id: "6", label: "6 (Very high risk)" }
+  - title: Competitive position inputs
+    fields:
+      - id: competitive_advantage_band
+        label: Competitive advantage (1-6)
+        type: select
+        options:
+          - { id: "1", label: "1 (Excellent)" }
+          - { id: "2", label: "2 (Strong)" }
+          - { id: "3", label: "3 (Satisfactory)" }
+          - { id: "4", label: "4 (Fair)" }
+          - { id: "5", label: "5 (Weak)" }
+          - { id: "6", label: "6 (Vulnerable)" }
+      - id: scale_scope_diversity_band
+        label: Scale, scope, and diversity (1-6)
+        type: select
+        options:
+          - { id: "1", label: "1 (Excellent)" }
+          - { id: "2", label: "2 (Strong)" }
+          - { id: "3", label: "3 (Satisfactory)" }
+          - { id: "4", label: "4 (Fair)" }
+          - { id: "5", label: "5 (Weak)" }
+          - { id: "6", label: "6 (Vulnerable)" }
+      - id: operating_efficiency_band
+        label: Operating efficiency (1-6)
+        type: select
+        options:
+          - { id: "1", label: "1 (Excellent)" }
+          - { id: "2", label: "2 (Strong)" }
+          - { id: "3", label: "3 (Satisfactory)" }
+          - { id: "4", label: "4 (Fair)" }
+          - { id: "5", label: "5 (Weak)" }
+          - { id: "6", label: "6 (Vulnerable)" }
+  - title: Core financials (Mn)
+    fields:
+      - id: revenue_mn
+        label: Revenue (Mn)
+        type: number
+      - id: ebit_mn
+        label: EBIT (Mn)
+        type: number
+      - id: depreciation_mn
+        label: Depreciation (Mn)
+        type: number
+      - id: amortization_mn
+        label: Amortization (Mn)
+        type: number
+      - id: interest_expense_mn
+        label: Interest expense (Mn)
+        type: number
+      - id: cash_interest_paid_mn
+        label: Cash interest paid (Mn)
+        type: number
+      - id: cash_taxes_paid_mn
+        label: Cash taxes paid (Mn)
+        type: number
+  - title: Balance sheet / leverage inputs (Mn)
+    fields:
+      - id: total_debt_mn
+        label: Adjusted debt (Mn)
+        type: number
+      - id: cash_mn
+        label: Cash and liquid investments (Mn)
+        type: number
+      - id: avg_capital_mn
+        label: Average capital (Mn)
+        type: number
+  - title: Cash flow inputs (Mn)
+    fields:
+      - id: cfo_mn
+        label: Cash flow from operations (CFO, Mn)
+        type: number
+      - id: capex_mn
+        label: Capital expenditure (Mn)
+        type: number
+      - id: dividends_paid_mn
+        label: Dividends paid (Mn)
+        type: number
+      - id: share_buybacks_mn
+        label: Share buybacks (Mn)
+        type: number
+  - title: Liquidity inputs
+    fields:
+      - id: liquidity_sources_mn
+        label: Liquidity sources (Mn)
+        type: number
+      - id: liquidity_uses_mn
+        label: Liquidity uses (Mn)
+        type: number
+      - id: liquidity_descriptor
+        label: Liquidity descriptor
+        type: select
+        options:
+          - { id: exceptional, label: Exceptional }
+          - { id: strong, label: Strong }
+          - { id: adequate, label: Adequate }
+          - { id: less_than_adequate, label: Less than adequate }
+          - { id: weak, label: Weak }
+  - title: Financial policy
+    fields:
+      - id: financial_policy_assessment
+        label: Financial policy assessment
+        type: select
+        options:
+          - { id: positive, label: Positive }
+          - { id: neutral, label: Neutral }
+          - { id: negative, label: Negative }
+          - { id: fs4, label: FS-4 }
+          - { id: fs5, label: FS-5 }
+          - { id: fs6, label: FS-6 }
+  - title: Capital structure
+    fields:
+      - id: capital_structure_assessment
+        label: Capital structure assessment
+        type: select
+        options:
+          - { id: very_positive, label: Very positive }
+          - { id: positive, label: Positive }
+          - { id: neutral, label: Neutral }
+          - { id: negative, label: Negative }
+          - { id: very_negative, label: Very negative }
+  - title: Diversification / portfolio effect
+    fields:
+      - id: diversification_assessment
+        label: Diversification assessment
+        type: select
+        options:
+          - { id: positive, label: Positive }
+          - { id: neutral, label: Neutral }
+          - { id: negative, label: Negative }
+  - title: Comparable ratings analysis
+    fields:
+      - id: comparable_assessment
+        label: Comparable ratings assessment
+        type: select
+        options:
+          - { id: positive, label: Positive }
+          - { id: neutral, label: Neutral }
+          - { id: negative, label: Negative }
+  - title: Management and Governance
+    fields:
+      - id: mg_ownership_structure
+        label: Ownership structure
+        type: select
+        options:
+          - { id: positive, label: Positive }
+          - { id: neutral, label: Neutral }
+          - { id: negative, label: Negative }
+      - id: mg_board_structure
+        label: Board structure, composition, and effectiveness
+        type: select
+        options:
+          - { id: positive, label: Positive }
+          - { id: neutral, label: Neutral }
+          - { id: negative, label: Negative }
+      - id: mg_risk_management
+        label: Risk management, internal controls, and audit
+        type: select
+        options:
+          - { id: positive, label: Positive }
+          - { id: neutral, label: Neutral }
+          - { id: negative, label: Negative }
+      - id: mg_transparency
+        label: Transparency and reporting
+        type: select
+        options:
+          - { id: neutral, label: Neutral }
+          - { id: negative, label: Negative }
+      - id: mg_management
+        label: Management
+        type: select
+        options:
+          - { id: positive, label: Positive }
+          - { id: neutral, label: Neutral }
+          - { id: negative, label: Negative }

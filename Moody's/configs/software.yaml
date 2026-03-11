@@ -1,0 +1,469 @@
+id: software
+name: Software
+version: 23 Jun 2022
+factors:
+- id: factor_1_business_profile
+  name: Business Profile
+  weight_pct: 25
+  subfactors:
+  - id: product_line_diversity
+    name: Product Line Diversity (qualitative)
+    metric: product_line_diversity_band
+    weight_pct: 5
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+  - id: geographic_diversity
+    name: Geographic Diversity (qualitative)
+    metric: geographic_diversity_band
+    weight_pct: 5
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+  - id: end_market_diversity
+    name: End-Market Diversity (qualitative)
+    metric: end_market_diversity_band
+    weight_pct: 5
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+  - id: market_share
+    name: Market Share (qualitative)
+    metric: market_share_band
+    weight_pct: 10
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+- id: factor_2_scale
+  name: Scale
+  weight_pct: 15
+  subfactors:
+  - id: revenue
+    name: Revenue (USD Billion)
+    metric: revenue_usd_billion
+    weight_pct: 10
+    direction: higher_better
+    units: USD_billion
+    grid:
+    - band: Aaa
+      score: 1
+      min: 60.0
+      max: null
+    - band: Aa
+      score: 2
+      min: 30.0
+      max: 60.0
+    - band: A
+      score: 3
+      min: 15.0
+      max: 30.0
+    - band: Baa
+      score: 4
+      min: 3.0
+      max: 15.0
+    - band: Ba
+      score: 5
+      min: 0.75
+      max: 3.0
+    - band: B
+      score: 6
+      min: 0.25
+      max: 0.75
+    - band: Caa
+      score: 7
+      min: 0.1
+      max: 0.25
+    - band: Ca
+      score: 8
+      min: 0.0
+      max: 0.1
+  - id: free_cash_flow
+    name: Free Cash Flow (USD Billion)
+    metric: free_cash_flow_usd_billion
+    weight_pct: 5
+    direction: higher_better
+    units: USD_billion
+    grid:
+    - band: Aaa
+      score: 1
+      min: 12.5
+      max: null
+    - band: Aa
+      score: 2
+      min: 7.5
+      max: 12.5
+    - band: A
+      score: 3
+      min: 3.75
+      max: 7.5
+    - band: Baa
+      score: 4
+      min: 0.75
+      max: 3.75
+    - band: Ba
+      score: 5
+      min: 0.1875
+      max: 0.75
+    - band: B
+      score: 6
+      min: 0.0625
+      max: 0.1875
+    - band: Caa
+      score: 7
+      min: 0.0
+      max: 0.0625
+    - band: Ca
+      score: 8
+      min: -1000000000.0
+      max: 0.0
+- id: factor_3_profitability
+  name: Profitability
+  weight_pct: 10
+  subfactors:
+  - id: operating_income_roa
+    name: Operating Income ROA (Net of Cash + Marketable Securities)
+    metric: operating_income_roa_net_cash_mktsec_pct
+    weight_pct: 10
+    direction: higher_better
+    units: percent
+    grid:
+    - band: Aaa
+      score: 1
+      min: 30.0
+      max: null
+    - band: Aa
+      score: 2
+      min: 25.0
+      max: 30.0
+    - band: A
+      score: 3
+      min: 20.0
+      max: 25.0
+    - band: Baa
+      score: 4
+      min: 15.0
+      max: 20.0
+    - band: Ba
+      score: 5
+      min: 10.0
+      max: 15.0
+    - band: B
+      score: 6
+      min: 5.0
+      max: 10.0
+    - band: Caa
+      score: 7
+      min: 0.0
+      max: 5.0
+    - band: Ca
+      score: 8
+      min: -1000000000.0
+      max: 0.0
+- id: factor_4_leverage_coverage
+  name: Leverage and Coverage
+  weight_pct: 30
+  subfactors:
+  - id: debt_ebitda
+    name: Debt / EBITDA
+    metric: debt_ebitda_x
+    weight_pct: 10
+    direction: lower_better
+    units: times
+    grid:
+    - band: Aaa
+      score: 1
+      min: 0.0
+      max: 0.5
+    - band: Aa
+      score: 2
+      min: 0.5
+      max: 1.0
+    - band: A
+      score: 3
+      min: 1.0
+      max: 1.5
+    - band: Baa
+      score: 4
+      min: 1.5
+      max: 2.5
+    - band: Ba
+      score: 5
+      min: 2.5
+      max: 4.0
+    - band: B
+      score: 6
+      min: 4.0
+      max: 6.5
+    - band: Caa
+      score: 7
+      min: 6.5
+      max: 9.0
+    - band: Ca
+      score: 8
+      min: 9.0
+      max: null
+    notes: 'Footnote [1]: when debt is zero, score is Aa; when debt is positive and EBITDA is negative, score is Ca.'
+  - id: ebitda_minus_capex_interest
+    name: (EBITDA - CapEx) / Interest Expense
+    metric: ebitda_minus_capex_interest_x
+    weight_pct: 5
+    direction: higher_better
+    units: times
+    grid:
+    - band: Aaa
+      score: 1
+      min: 22.0
+      max: null
+    - band: Aa
+      score: 2
+      min: 16.0
+      max: 22.0
+    - band: A
+      score: 3
+      min: 9.0
+      max: 16.0
+    - band: Baa
+      score: 4
+      min: 4.5
+      max: 9.0
+    - band: Ba
+      score: 5
+      min: 2.5
+      max: 4.5
+    - band: B
+      score: 6
+      min: 1.25
+      max: 2.5
+    - band: Caa
+      score: 7
+      min: 0.25
+      max: 1.25
+    - band: Ca
+      score: 8
+      min: -1000000000.0
+      max: 0.25
+  - id: fcf_debt
+    name: FCF / Debt
+    metric: fcf_debt_pct
+    weight_pct: 10
+    direction: higher_better
+    units: percent
+    grid:
+    - band: Aaa
+      score: 1
+      min: 75.0
+      max: null
+    - band: Aa
+      score: 2
+      min: 50.0
+      max: 75.0
+    - band: A
+      score: 3
+      min: 35.0
+      max: 50.0
+    - band: Baa
+      score: 4
+      min: 20.0
+      max: 35.0
+    - band: Ba
+      score: 5
+      min: 12.5
+      max: 20.0
+    - band: B
+      score: 6
+      min: 5.0
+      max: 12.5
+    - band: Caa
+      score: 7
+      min: 0.0
+      max: 5.0
+    - band: Ca
+      score: 8
+      min: -1000000000.0
+      max: 0.0
+  - id: cash_mktsec_debt
+    name: (Cash + Marketable Securities) / Debt
+    metric: cash_marketable_securities_debt_pct
+    weight_pct: 5
+    direction: higher_better
+    units: percent
+    grid:
+    - band: Aaa
+      score: 1
+      min: 175.0
+      max: null
+    - band: Aa
+      score: 2
+      min: 125.0
+      max: 175.0
+    - band: A
+      score: 3
+      min: 75.0
+      max: 125.0
+    - band: Baa
+      score: 4
+      min: 35.0
+      max: 75.0
+    - band: Ba
+      score: 5
+      min: 20.0
+      max: 35.0
+    - band: B
+      score: 6
+      min: 7.5
+      max: 20.0
+    - band: Caa
+      score: 7
+      min: 2.5
+      max: 7.5
+    - band: Ca
+      score: 8
+      min: 0.0
+      max: 2.5
+- id: factor_5_financial_policy
+  name: Financial Policy
+  weight_pct: 20
+  subfactors:
+  - id: financial_policy
+    name: Financial Policy (qualitative)
+    metric: financial_policy_band
+    weight_pct: 20
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+score_to_rating:
+- min_score: 0.0
+  max_score: 1.5
+  rating: Aaa
+- min_score: 1.5
+  max_score: 2.5
+  rating: Aa1
+- min_score: 2.5
+  max_score: 3.5
+  rating: Aa2
+- min_score: 3.5
+  max_score: 4.5
+  rating: Aa3
+- min_score: 4.5
+  max_score: 5.5
+  rating: A1
+- min_score: 5.5
+  max_score: 6.5
+  rating: A2
+- min_score: 6.5
+  max_score: 7.5
+  rating: A3
+- min_score: 7.5
+  max_score: 8.5
+  rating: Baa1
+- min_score: 8.5
+  max_score: 9.5
+  rating: Baa2
+- min_score: 9.5
+  max_score: 10.5
+  rating: Baa3
+- min_score: 10.5
+  max_score: 11.5
+  rating: Ba1
+- min_score: 11.5
+  max_score: 12.5
+  rating: Ba2
+- min_score: 12.5
+  max_score: 13.5
+  rating: Ba3
+- min_score: 13.5
+  max_score: 14.5
+  rating: B1
+- min_score: 14.5
+  max_score: 15.5
+  rating: B2
+- min_score: 15.5
+  max_score: 16.5
+  rating: B3
+- min_score: 16.5
+  max_score: 17.5
+  rating: Caa1
+- min_score: 17.5
+  max_score: 18.5
+  rating: Caa2
+- min_score: 18.5
+  max_score: 19.5
+  rating: Caa3
+- min_score: 19.5
+  max_score: 99.9
+  rating: Ca

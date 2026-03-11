@@ -1,0 +1,19 @@
+id: liquidity
+name: Liquidity
+version: 1
+descriptors:
+  exceptional:
+    label: Exceptional
+    cap_rating: null
+  strong:
+    label: Strong
+    cap_rating: null
+  adequate:
+    label: Adequate
+    cap_rating: null
+  less_than_adequate:
+    label: Less than adequate
+    cap_rating: BB+
+  weak:
+    label: Weak
+    cap_rating: B-

@@ -1,0 +1,32 @@
+{
+  "name": "credit-pricing-tool",
+  "version": "0.1.0",
+  "description": "Dual-engine credit rating and pricing tool for NZ financial institutions",
+  "main": "index.js",
+  "scripts": {
+    "test": "python -m pytest tests/ -v",
+    "test:sp": "python tests/test_sp.py",
+    "test:moodys": "python tests/test_moodys.py",
+    "dev": "python -m fastapi run api/main.py --reload",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd src && npm run build"
+  },
+  "keywords": [
+    "credit",
+    "rating",
+    "pricing",
+    "S&P",
+    "Moody's",
+    "financial"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "webpack": "^5.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: credit-pricing-tool
+    runtime: docker
+    healthCheckPath: /health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false

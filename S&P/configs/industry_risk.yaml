@@ -1,0 +1,44 @@
+id: industry_risk
+name: Industry Risk
+version: 1
+factors:
+- id: cyclicality
+  name: Cyclicality
+  weight_pct: 50
+  subfactors:
+  - id: cyclicality_assessment
+    name: Cyclicality assessment (1-6)
+    metric: cyclicality_score
+    weight_pct: 100
+    direction: qualitative
+    grid:
+    - { band: "1", score: 1 }
+    - { band: "2", score: 2 }
+    - { band: "3", score: 3 }
+    - { band: "4", score: 4 }
+    - { band: "5", score: 5 }
+    - { band: "6", score: 6 }
+- id: competitive_risk
+  name: Competitive Risk and Growth
+  weight_pct: 50
+  subfactors:
+  - id: competitive_risk_assessment
+    name: Competitive risk and growth assessment (1-6)
+    metric: competitive_risk_score
+    weight_pct: 100
+    direction: qualitative
+    grid:
+    - { band: "1", score: 1 }
+    - { band: "2", score: 2 }
+    - { band: "3", score: 3 }
+    - { band: "4", score: 4 }
+    - { band: "5", score: 5 }
+    - { band: "6", score: 6 }
+matrix:
+  # rows = cyclicality (1-6), cols = competitive risk/growth (1-6)
+  - [1, 2, 3, 4, 5, 6]
+  - [2, 2, 2, 3, 4, 5]
+  - [2, 2, 3, 4, 5, 6]
+  - [3, 3, 3, 4, 5, 6]
+  - [3, 4, 4, 5, 5, 6]
+  - [4, 4, 5, 5, 6, 6]

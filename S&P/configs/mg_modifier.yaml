@@ -1,0 +1,24 @@
+id: mg_modifier
+name: Management and Governance
+version: 1
+subfactors:
+  - id: ownership_structure
+    name: Ownership structure
+    options: [positive, neutral, negative]
+  - id: board_structure
+    name: Board structure, composition, and effectiveness
+    options: [positive, neutral, negative]
+  - id: risk_management
+    name: Risk management, internal controls, and audit
+    options: [positive, neutral, negative]
+  - id: transparency
+    name: Transparency and reporting
+    options: [neutral, negative]
+  - id: management
+    name: Management
+    options: [positive, neutral, negative]
+final_scale:
+  positive: 1
+  neutral: 2
+  moderately_negative: 3
+  negative: 4

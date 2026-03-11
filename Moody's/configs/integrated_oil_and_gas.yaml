@@ -1,0 +1,279 @@
+id: integrated_oil_and_gas
+name: Integrated Oil and Gas
+version: "23 Sep 2022"
+
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 20
+    subfactors:
+      - id: average_daily_production
+        name: Average Daily Production (Mboe/d)
+        metric: avg_daily_production_mboed
+        weight_pct: 10
+        direction: higher_better
+        units: Mboe_per_day
+        grid:
+          - { band: "Aaa", score: 1, min: 2750.0, max: null }
+          - { band: "Aa",  score: 2, min: 1100.0, max: 2750.0 }
+          - { band: "A",   score: 3, min: 550.0,  max: 1100.0 }
+          - { band: "Baa", score: 4, min: 140.0,  max: 550.0 }
+          - { band: "Ba",  score: 5, min: 55.0,   max: 140.0 }
+          - { band: "B",   score: 6, min: 20.0,   max: 55.0 }
+          - { band: "Caa", score: 7, min: 10.0,   max: 20.0 }
+          - { band: "Ca",  score: 8, min: 0.0,    max: 10.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 5000.0
+          ca_endpoint_value: 0.0
+          note: "Footnote: 5,000 Mboe/d (or better) => numeric 0.5; 0 => numeric 20.5."
+
+      - id: proved_reserves
+        name: Proved Reserves (MMboe)
+        metric: proved_reserves_mmboe
+        weight_pct: 5
+        direction: higher_better
+        units: MMboe
+        grid:
+          - { band: "Aaa", score: 1, min: 10000.0, max: null }
+          - { band: "Aa",  score: 2, min: 5000.0,  max: 10000.0 }
+          - { band: "A",   score: 3, min: 2000.0,  max: 5000.0 }
+          - { band: "Baa", score: 4, min: 500.0,   max: 2000.0 }
+          - { band: "Ba",  score: 5, min: 100.0,   max: 500.0 }
+          - { band: "B",   score: 6, min: 30.0,    max: 100.0 }
+          - { band: "Caa", score: 7, min: 10.0,    max: 30.0 }
+          - { band: "Ca",  score: 8, min: 0.0,     max: 10.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 15000.0
+          ca_endpoint_value: 0.0
+          note: "Footnote: 15,000 MMboe (or better) => numeric 0.5; 0 => numeric 20.5."
+
+      - id: crude_distillation_capacity
+        name: Crude Distillation Capacity (Mbbls/d)
+        metric: crude_distillation_capacity_mbbld
+        weight_pct: 5
+        direction: higher_better
+        units: Mbbls_per_day
+        grid:
+          - { band: "Aaa", score: 1, min: 3000.0, max: null }
+          - { band: "Aa",  score: 2, min: 2000.0, max: 3000.0 }
+          - { band: "A",   score: 3, min: 1000.0, max: 2000.0 }
+          - { band: "Baa", score: 4, min: 500.0,  max: 1000.0 }
+          - { band: "Ba",  score: 5, min: 250.0,  max: 500.0 }
+          - { band: "B",   score: 6, min: 50.0,   max: 250.0 }
+          - { band: "Caa", score: 7, min: 25.0,   max: 50.0 }
+          - { band: "Ca",  score: 8, min: 0.0,    max: 25.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 4000.0
+          ca_endpoint_value: 10.0
+          note: "Footnote: 4,000 Mbbls/d (or better) => numeric 0.5; 10 Mbbls/d (or worse) => numeric 20.5."
+
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 25
+    subfactors:
+      - id: business_profile
+        name: Business Profile (qualitative)
+        metric: business_profile_band
+        weight_pct: 25
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Production, reserves and resources are extremely large and diversified; extremely strong reserve replacement; industry leader in executing complex upstream/LNG projects; leading technology across main plays; very large global LNG franchise; extensive integration along the oil & gas value chain; extremely large/efficient refining and strong marketing; strong chemicals franchise with structural cost advantages and tech leadership; limited competitive threats.
+          - band: "Aa"
+            score: 2
+            description: Very large and diversified production/reserves/resources; very strong reserve replacement; very strong execution of complex upstream/LNG; very strong technology across most key plays; very large LNG franchise in several key markets; very strong integration and efficiency; very large refineries and strong marketing; chemicals franchise with very strong positions supported by structural cost advantages and tech leadership; few competitive threats.
+          - band: "A"
+            score: 3
+            description: Large and well-diversified production/reserves/resources; strong reserve replacement; strong execution of complex upstream/LNG; strong leadership in selected technologies; large LNG portfolio; strong integration along the value chain; efficient large refineries and strong marketing; chemicals franchise with strong positions supported by predominantly low-cost operations and tech leadership; meaningful barriers to entry.
+          - band: "Baa"
+            score: 4
+            description: Moderately diversified production/reserves; fairly large resource base with some basin concentration; limited consistency in reserve replacement; fairly strong project execution with mixed record on complex upstream/LNG and some reliance on partners; fairly strong technology in selected areas; some LNG; material integration; meaningful refining/marketing; chemicals franchise cost-competitive in more than one region; moderate competitive threats.
+          - band: "Ba"
+            score: 5
+            description: Fairly concentrated production/reserves or moderately sized resource base; inconsistent reserve replacement record; moderate execution with limited/mixed complex upstream record and reliance on partners; significant reliance on partners’ technology; no LNG; some integration; small number of mid-sized refineries with meaningful marketing in a single national market; regional chemicals franchise in more cyclical end-markets; limited differentiation and/or equity investments in chemicals.
+          - band: "B"
+            score: 6
+            description: Concentrated production/reserves or small resource base; weak reserve replacement record; limited execution with heavy reliance on partners and partners’ technology; no LNG; limited integration; refining franchise immaterial; mainly subscale refineries with weak marketing; chemicals franchise immaterial.
+          - band: "Caa"
+            score: 7
+            description: Very concentrated production/reserves or very small resource base; poor reserve replacement record; weak execution and essentially all key projects operated by partners; no LNG; very limited integration; refining franchise immaterial; subscale refineries and very weak marketing; chemicals franchise immaterial.
+          - band: "Ca"
+            score: 8
+            description: Extremely concentrated production/reserves or extremely small resource base; poor reserve replacement record; very weak execution and all key projects operated by partners; no LNG; essentially no integration; no meaningful refining franchise; no chemicals franchise.
+
+  - id: factor_3_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 10
+    subfactors:
+      - id: ebit_avg_book_capitalization
+        name: EBIT / Average Book Capitalisation
+        metric: ebit_avg_book_cap_pct
+        weight_pct: 5
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 25.0, max: null }
+          - { band: "Aa",  score: 2, min: 20.0, max: 25.0 }
+          - { band: "A",   score: 3, min: 15.0, max: 20.0 }
+          - { band: "Baa", score: 4, min: 10.0, max: 15.0 }
+          - { band: "Ba",  score: 5, min: 5.0,  max: 10.0 }
+          - { band: "B",   score: 6, min: 3.0,  max: 5.0 }
+          - { band: "Caa", score: 7, min: 0.0,  max: 3.0 }
+          - { band: "Ca",  score: 8, min: -1000000000.0, max: 0.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 30.0
+          ca_endpoint_value: -5.0
+          note: "Footnote: 30% (or better) => numeric 0.5; -5% (or worse) => numeric 20.5."
+
+      - id: downstream_ebit_per_throughput
+        name: Downstream EBIT / Total Throughput Barrels ($/bbl)
+        metric: downstream_ebit_per_throughput_usd_per_bbl
+        weight_pct: 5
+        direction: higher_better
+        units: USD_per_bbl
+        grid:
+          - { band: "Aaa", score: 1, min: 15.0, max: null }
+          - { band: "Aa",  score: 2, min: 10.0, max: 15.0 }
+          - { band: "A",   score: 3, min: 7.0,  max: 10.0 }
+          - { band: "Baa", score: 4, min: 4.0,  max: 7.0 }
+          - { band: "Ba",  score: 5, min: 2.0,  max: 4.0 }
+          - { band: "B",   score: 6, min: 1.0,  max: 2.0 }
+          - { band: "Caa", score: 7, min: 0.0,  max: 1.0 }
+          - { band: "Ca",  score: 8, min: -1000000000.0, max: 0.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 20.0
+          ca_endpoint_value: -5.0
+          note: "Footnote: $20/bbl (or better) => numeric 0.5; -$5/bbl (or worse) => numeric 20.5."
+
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 25
+    subfactors:
+      - id: ebit_interest
+        name: EBIT / Interest Expense
+        metric: ebit_interest_x
+        weight_pct: 7.5
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 25.0, max: null }
+          - { band: "Aa",  score: 2, min: 15.0, max: 25.0 }
+          - { band: "A",   score: 3, min: 7.0,  max: 15.0 }
+          - { band: "Baa", score: 4, min: 4.0,  max: 7.0 }
+          - { band: "Ba",  score: 5, min: 2.0,  max: 4.0 }
+          - { band: "B",   score: 6, min: 1.0,  max: 2.0 }
+          - { band: "Caa", score: 7, min: 0.5,  max: 1.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 0.5 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 35.0
+          ca_endpoint_value: 0.0
+          note: "Footnote: 35x (or better) => numeric 0.5; 0x (or worse) => numeric 20.5; negative EBIT also maps to 20.5."
+        special_cases:
+          - when: { ebit_lt_0: true }
+            numeric_score: 20.5
+            note: "Negative EBIT => numeric 20.5 (worst)."
+
+      - id: rcf_net_debt
+        name: RCF / Net Debt
+        metric: rcf_net_debt_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 60.0, max: null }
+          - { band: "Aa",  score: 2, min: 40.0, max: 60.0 }
+          - { band: "A",   score: 3, min: 30.0, max: 40.0 }
+          - { band: "Baa", score: 4, min: 20.0, max: 30.0 }
+          - { band: "Ba",  score: 5, min: 10.0, max: 20.0 }
+          - { band: "B",   score: 6, min: 5.0,  max: 10.0 }
+          - { band: "Caa", score: 7, min: 2.0,  max: 5.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 2.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 100.0
+          ca_endpoint_value: 0.0
+          note: "Footnote: 100% (or better) => numeric 0.5; 0% (or worse) => numeric 20.5. If net debt is negative and RCF is positive => 0.5; if net debt is negative and RCF <= 0 => 20.5."
+        special_cases:
+          - when: { net_debt_lt_0: true, rcf_gt_0: true }
+            numeric_score: 0.5
+            note: "Net debt negative + RCF positive => numeric 0.5."
+          - when: { net_debt_lt_0: true, rcf_lte_0: true }
+            numeric_score: 20.5
+            note: "Net debt negative + RCF <= 0 => numeric 20.5."
+
+      - id: debt_book_cap
+        name: Debt / Book Capitalisation
+        metric: debt_book_cap_pct
+        weight_pct: 7.5
+        direction: lower_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0,  max: 20.0 }
+          - { band: "Aa",  score: 2, min: 20.0, max: 30.0 }
+          - { band: "A",   score: 3, min: 30.0, max: 40.0 }
+          - { band: "Baa", score: 4, min: 40.0, max: 50.0 }
+          - { band: "Ba",  score: 5, min: 50.0, max: 60.0 }
+          - { band: "B",   score: 6, min: 60.0, max: 70.0 }
+          - { band: "Caa", score: 7, min: 70.0, max: 80.0 }
+          - { band: "Ca",  score: 8, min: 80.0, max: null }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 0.0
+          ca_endpoint_value: 100.0
+          note: "Footnote: 0% => numeric 0.5; 100% (or worse) => numeric 20.5; negative Debt/Book Capitalisation also maps to 20.5."
+        special_cases:
+          - when: { debt_book_cap_lt_0: true }
+            numeric_score: 20.5
+            note: "Negative Debt/Book Capitalisation => numeric 20.5."
+
+  - id: factor_5_financial_policy
+    name: Financial Policy
+    weight_pct: 20
+    subfactors:
+      - id: financial_policy
+        name: Financial Policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 20
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Extremely conservative financial policies (including risk and liquidity management); very stable metrics; essentially no event risk causing a rating transition; and public commitment to a very strong credit profile over the long term.
+          - band: "Aa"
+            score: 2
+            description: Very conservative financial policies (including risk and liquidity management); stable metrics; minimal event risk causing a rating transition; and public commitment to a strong credit profile over the long term.
+          - band: "A"
+            score: 3
+            description: Predictable financial policies (including risk and liquidity management) that preserve creditor interests; modest event risk exists but the effect on leverage is likely small and temporary; strong commitment to a solid credit profile.
+          - band: "Baa"
+            score: 4
+            description: Financial policies (including risk and liquidity management) that balance the interests of creditors and shareholders; some risk that debt-funded acquisitions or shareholder distributions could lead to a weaker credit profile.
+          - band: "Ba"
+            score: 5
+            description: Financial policies (including risk and liquidity management) that tend to favour shareholders over creditors; above-average financial risk from shareholder distributions, acquisitions or other significant capital structure changes.
+          - band: "B"
+            score: 6
+            description: Financial policies (including risk and liquidity management) that favour shareholders over creditors; high financial risk from shareholder distributions, acquisitions or other significant capital structure changes.
+          - band: "Caa"
+            score: 7
+            description: Financial policies (including risk and liquidity management) that create elevated risk of debt restructuring in varied economic environments.
+          - band: "Ca"
+            score: 8
+            description: Financial policies (including risk and liquidity management) that create elevated risk of debt restructuring even in healthy economic environments.
+
+notching_factors:
+  - id: government_policy_framework
+    name: Government Policy Framework (Downward notches)
+    type: downward_notches
+    bands:
+      - notches: "0"
+        description: Low to no regulatory/fiscal risk; diversification or benign concentrations; predictable regulation/tax/energy policy; limited government ability to influence governance/strategy/financial policy (or influence is neutral/benign).
+      - notches: "1-2"
+        description: Moderate regulatory/fiscal risk; >50% of production/reserves in moderate-risk countries; generally modest current restrictions; some potential for policy change; government objectives broadly compatible with company objectives; limited power or unlikely negative impact.
+      - notches: "3-4"
+        description: Somewhat elevated regulatory/fiscal risk; diversification does not meaningfully reduce risk; periodic adjustments may impose modest constraints; government objectives emphasise maximising oil/gas revenues to fund social policies and employment with some potential negative impact; some power to influence with some negative impact.
+      - notches: "5-6"
+        description: High regulatory/fiscal risk; unpredictable policy environment that somewhat constrains profitability/position/operating capability; government objectives focus on maximising revenues with little regard for financial standing; likely influence on governance/strategy/financial policy with moderate negative impact.
+      - notches: "7-8"
+        description: Very high regulatory/fiscal risk; unpredictable and constraining policy environment; objectives focused on maximising revenues to fund social policies/employment with essentially no regard for financial standing; likely influence with significant negative impact.
+      - notches: "9-10"
+        description: Extremely high regulatory/fiscal risk; highly unpredictable and severely constraining policy environment; objectives focused on maximising revenues with no regard for financial standing; likely influence on governance/strategy/financial policy with significant negative impact.

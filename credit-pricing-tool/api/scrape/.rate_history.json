@@ -1,0 +1,506 @@
+{
+  "snapshots": [
+    {
+      "scraped_at": "2026-03-11T09:21:29.573948Z",
+      "products": [
+        {
+          "bank": "ASB",
+          "product_name": "Business base rate",
+          "rate_pct": 10.97,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:27.704707Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Rural base rate",
+          "rate_pct": 8.21,
+          "rate_type": "base_rate",
+          "category": "rural",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:27.704717Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Floating base rate",
+          "rate_pct": 4.14,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:27.704720Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Housing Variable",
+          "rate_pct": 5.79,
+          "rate_type": "base_rate",
+          "category": "housing",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:27.704722Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Flexible Finance Facility",
+          "rate_pct": 4.95,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:27.704723Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Societies Clubs and Churches",
+          "rate_pct": 5.45,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:27.704725Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Unarranged overdraft interest rate",
+          "rate_pct": 22.5,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:28.086477Z"
+        },
+        {
+          "bank": "BNZ",
+          "product_name": "Business overdraft base rate",
+          "rate_pct": 10.95,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.bnz.co.nz/business-banking/loans-and-finance/interest-rates-and-fees",
+          "scraped_at": "2026-03-11T09:21:28.223431Z"
+        },
+        {
+          "bank": "BNZ",
+          "product_name": "Market Connect",
+          "rate_pct": 5.49,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.bnz.co.nz/business-banking/loans-and-finance/interest-rates-and-fees",
+          "scraped_at": "2026-03-11T09:21:28.223442Z"
+        },
+        {
+          "bank": "BNZ",
+          "product_name": "ProjectPlus",
+          "rate_pct": 4.14,
+          "rate_type": "base_rate",
+          "category": "revolving_credit",
+          "source_url": "https://www.bnz.co.nz/business-banking/loans-and-finance/interest-rates-and-fees",
+          "scraped_at": "2026-03-11T09:21:28.223464Z"
+        },
+        {
+          "bank": "BNZ",
+          "product_name": "CashFlow Plus",
+          "rate_pct": 5.81,
+          "rate_type": "base_rate",
+          "category": "invoice_finance",
+          "source_url": "https://www.bnz.co.nz/business-banking/loans-and-finance/interest-rates-and-fees",
+          "scraped_at": "2026-03-11T09:21:28.223481Z"
+        },
+        {
+          "bank": "ANZ",
+          "product_name": "Corporate Indicator rate",
+          "rate_pct": 4.86,
+          "rate_type": "indicator",
+          "category": "corporate",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308551Z"
+        },
+        {
+          "bank": "ANZ",
+          "product_name": "Working Capital Base rate",
+          "rate_pct": 10.65,
+          "rate_type": "base_rate",
+          "category": "working_capital",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308568Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Business Lending Base Rate",
+          "rate_pct": 11.52,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308581Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Rural base rate",
+          "rate_pct": 8.76,
+          "rate_type": "base_rate",
+          "category": "rural",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308590Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Corporate Indicator rate",
+          "rate_pct": 5.93,
+          "rate_type": "indicator",
+          "category": "corporate",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308598Z"
+        },
+        {
+          "bank": "BNZ",
+          "product_name": "Business Overdraft",
+          "rate_pct": 10.95,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308619Z"
+        },
+        {
+          "bank": "Cash Flow Funding",
+          "product_name": "CFF Overdraft",
+          "rate_pct": 10.5,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308635Z"
+        },
+        {
+          "bank": "Fuelled",
+          "product_name": "Invoice funding via Xero",
+          "rate_pct": 15.0,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308644Z"
+        },
+        {
+          "bank": "Heartland",
+          "product_name": "Business Funding",
+          "rate_pct": 10.0,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308654Z"
+        },
+        {
+          "bank": "Kiwibank",
+          "product_name": "Business Overdraft Rate",
+          "rate_pct": 7.5,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308664Z"
+        },
+        {
+          "bank": "Kiwibank",
+          "product_name": "Business Home Equity Rate",
+          "rate_pct": 6.15,
+          "rate_type": "base_rate",
+          "category": "housing",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308673Z"
+        },
+        {
+          "bank": "Taxi",
+          "product_name": "Tax-backed working capital facility",
+          "rate_pct": 5.4,
+          "rate_type": "base_rate",
+          "category": "working_capital",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308682Z"
+        },
+        {
+          "bank": "Zip Business",
+          "product_name": "Business Loan, P&amp;I",
+          "rate_pct": 6.0,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308692Z"
+        },
+        {
+          "bank": "Westpac",
+          "product_name": "Overdraft more than $5,000",
+          "rate_pct": 13.95,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:28.308702Z"
+        }
+      ],
+      "ocr": {
+        "rate_name": "Official Cash Rate (OCR)",
+        "rate_pct": 2.25,
+        "decision_date": "11-26-2025",
+        "source": "RBNZ via global-rates.com",
+        "scraped_at": "2026-03-11T09:21:29.489462Z"
+      },
+      "bkbm_swap_rates": [],
+      "banks_scraped": [
+        "ANZ",
+        "ASB",
+        "BNZ",
+        "Cash Flow Funding",
+        "Fuelled",
+        "Heartland",
+        "Kiwibank",
+        "Taxi",
+        "Westpac",
+        "Zip Business"
+      ],
+      "product_count": 25
+    },
+    {
+      "scraped_at": "2026-03-11T09:21:31.494936Z",
+      "products": [
+        {
+          "bank": "ASB",
+          "product_name": "Business base rate",
+          "rate_pct": 10.97,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:29.818304Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Rural base rate",
+          "rate_pct": 8.21,
+          "rate_type": "base_rate",
+          "category": "rural",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:29.818313Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Floating base rate",
+          "rate_pct": 4.14,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:29.818315Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Housing Variable",
+          "rate_pct": 5.79,
+          "rate_type": "base_rate",
+          "category": "housing",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:29.818317Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Flexible Finance Facility",
+          "rate_pct": 4.95,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:29.818319Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Societies Clubs and Churches",
+          "rate_pct": 5.45,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:29.818321Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Unarranged overdraft interest rate",
+          "rate_pct": 22.5,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.asb.co.nz/business-loans/interest-rates-fees.html",
+          "scraped_at": "2026-03-11T09:21:30.082761Z"
+        },
+        {
+          "bank": "BNZ",
+          "product_name": "Business overdraft base rate",
+          "rate_pct": 10.95,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.bnz.co.nz/business-banking/loans-and-finance/interest-rates-and-fees",
+          "scraped_at": "2026-03-11T09:21:30.172348Z"
+        },
+        {
+          "bank": "BNZ",
+          "product_name": "Market Connect",
+          "rate_pct": 5.49,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.bnz.co.nz/business-banking/loans-and-finance/interest-rates-and-fees",
+          "scraped_at": "2026-03-11T09:21:30.172360Z"
+        },
+        {
+          "bank": "BNZ",
+          "product_name": "ProjectPlus",
+          "rate_pct": 4.14,
+          "rate_type": "base_rate",
+          "category": "revolving_credit",
+          "source_url": "https://www.bnz.co.nz/business-banking/loans-and-finance/interest-rates-and-fees",
+          "scraped_at": "2026-03-11T09:21:30.172378Z"
+        },
+        {
+          "bank": "BNZ",
+          "product_name": "CashFlow Plus",
+          "rate_pct": 5.81,
+          "rate_type": "base_rate",
+          "category": "invoice_finance",
+          "source_url": "https://www.bnz.co.nz/business-banking/loans-and-finance/interest-rates-and-fees",
+          "scraped_at": "2026-03-11T09:21:30.172395Z"
+        },
+        {
+          "bank": "ANZ",
+          "product_name": "Corporate Indicator rate",
+          "rate_pct": 4.86,
+          "rate_type": "indicator",
+          "category": "corporate",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254246Z"
+        },
+        {
+          "bank": "ANZ",
+          "product_name": "Working Capital Base rate",
+          "rate_pct": 10.65,
+          "rate_type": "base_rate",
+          "category": "working_capital",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254267Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Business Lending Base Rate",
+          "rate_pct": 11.52,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254280Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Rural base rate",
+          "rate_pct": 8.76,
+          "rate_type": "base_rate",
+          "category": "rural",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254289Z"
+        },
+        {
+          "bank": "ASB",
+          "product_name": "Corporate Indicator rate",
+          "rate_pct": 5.93,
+          "rate_type": "indicator",
+          "category": "corporate",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254297Z"
+        },
+        {
+          "bank": "BNZ",
+          "product_name": "Business Overdraft",
+          "rate_pct": 10.95,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254315Z"
+        },
+        {
+          "bank": "Cash Flow Funding",
+          "product_name": "CFF Overdraft",
+          "rate_pct": 10.5,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254329Z"
+        },
+        {
+          "bank": "Fuelled",
+          "product_name": "Invoice funding via Xero",
+          "rate_pct": 15.0,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254339Z"
+        },
+        {
+          "bank": "Heartland",
+          "product_name": "Business Funding",
+          "rate_pct": 10.0,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254348Z"
+        },
+        {
+          "bank": "Kiwibank",
+          "product_name": "Business Overdraft Rate",
+          "rate_pct": 7.5,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254357Z"
+        },
+        {
+          "bank": "Kiwibank",
+          "product_name": "Business Home Equity Rate",
+          "rate_pct": 6.15,
+          "rate_type": "base_rate",
+          "category": "housing",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254365Z"
+        },
+        {
+          "bank": "Taxi",
+          "product_name": "Tax-backed working capital facility",
+          "rate_pct": 5.4,
+          "rate_type": "base_rate",
+          "category": "working_capital",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254373Z"
+        },
+        {
+          "bank": "Zip Business",
+          "product_name": "Business Loan, P&amp;I",
+          "rate_pct": 6.0,
+          "rate_type": "base_rate",
+          "category": "business_lending",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254382Z"
+        },
+        {
+          "bank": "Westpac",
+          "product_name": "Overdraft more than $5,000",
+          "rate_pct": 13.95,
+          "rate_type": "overdraft",
+          "category": "overdraft",
+          "source_url": "https://www.interest.co.nz/borrowing/business-base-rates",
+          "scraped_at": "2026-03-11T09:21:30.254390Z"
+        }
+      ],
+      "ocr": {
+        "rate_name": "Official Cash Rate (OCR)",
+        "rate_pct": 2.25,
+        "decision_date": "11-26-2025",
+        "source": "RBNZ via global-rates.com",
+        "scraped_at": "2026-03-11T09:21:31.407059Z"
+      },
+      "bkbm_swap_rates": [],
+      "banks_scraped": [
+        "ANZ",
+        "ASB",
+        "BNZ",
+        "Cash Flow Funding",
+        "Fuelled",
+        "Heartland",
+        "Kiwibank",
+        "Taxi",
+        "Westpac",
+        "Zip Business"
+      ],
+      "product_count": 25
+    }
+  ]
+}

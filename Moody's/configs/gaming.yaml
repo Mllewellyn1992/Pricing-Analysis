@@ -1,0 +1,163 @@
+id: gaming
+name: Gaming
+version: "12 Sep 2025"
+notes:
+  - This scorecard exhibit in the source PDF shows bands Aaa through Baa only.
+  - Lower bands (Ba/B/Caa/Ca) are not present, so grids are intentionally limited.
+
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 10
+    subfactors:
+      - id: revenue
+        name: Revenue (USD Billion)
+        metric: revenue_usd_billion
+        weight_pct: 10
+        direction: higher_better
+        units: USD_billion
+        grid:
+          - { band: "Aaa", score: 1, min: 50.0, max: null }
+          - { band: "Aa",  score: 2, min: 20.0, max: 50.0 }
+          - { band: "A",   score: 3, min: 10.0, max: 20.0 }
+          - { band: "Baa", score: 4, min: 5.0, max: 10.0 }
+
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 25
+    subfactors:
+      - id: market_characteristics
+        name: Market Characteristics (qualitative)
+        metric: market_characteristics_band
+        weight_pct: 10
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Gaming demand exceeds supply by a very wide margin and is expected to continue to grow; all gaming facilities are located in close proximity to extremely high-density population areas; regulatory framework is fully developed, extremely predictable and stable, and very unlikely to change, including through legislation.
+          - band: "Aa"
+            score: 2
+            description: Gaming demand exceeds supply by a very wide margin; most gaming facilities are located in close proximity to very high-density population areas; regulatory framework is fully developed, very predictable and stable, and unlikely to change, including through legislation.
+          - band: "A"
+            score: 3
+            description: Gaming demand exceeds supply; most gaming facilities are located in close proximity to high-density population areas; regulatory framework is fully developed, predictable and stable, and unlikely to change, including through legislation.
+          - band: "Baa"
+            score: 4
+            description: Gaming demand is equal to supply; gaming facilities are primarily located in close proximity to high-density population areas; regulatory framework is fully developed, somewhat predictable and stable, and has a low probability of change, including through legislation.
+
+      - id: market_position
+        name: Market Position (qualitative)
+        metric: market_position_band
+        weight_pct: 5
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Company captures all of the market share in all of the markets in which it operates.
+          - band: "Aa"
+            score: 2
+            description: Company captures almost all of the market share in the key markets in which it operates.
+          - band: "A"
+            score: 3
+            description: Company captures a very large market share in the key markets in which it operates.
+          - band: "Baa"
+            score: 4
+            description: Company captures a large market share in the key markets in which it operates.
+
+      - id: diversification
+        name: Diversification (qualitative)
+        metric: diversification_band
+        weight_pct: 10
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Very wide geographic diversification of gaming facilities globally; cash flow contribution is well-balanced across properties, revenue sources and delivery channels (e.g., physical facilities, online gaming, sports betting).
+          - band: "Aa"
+            score: 2
+            description: Wide geographic diversification of gaming facilities globally; cash flow contribution is well-balanced across properties, revenue sources and delivery channels (e.g., physical facilities, online gaming, sports betting).
+          - band: "A"
+            score: 3
+            description: Wide geographic diversification of gaming facilities across countries within a region; cash flow contribution is well-balanced across properties, revenue sources and delivery channels (e.g., physical facilities, online gaming, sports betting).
+          - band: "Baa"
+            score: 4
+            description: Wide geographic diversification of gaming facilities across jurisdictions within a country; cash flow contribution is moderately balanced across properties, revenue sources and delivery channels (e.g., physical facilities, online gaming, sports betting).
+
+  - id: factor_3_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 10
+    subfactors:
+      - id: ebit_margin
+        name: EBIT Margin (EBIT / Revenue)
+        metric: ebit_margin_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 60.0, max: null }
+          - { band: "Aa",  score: 2, min: 45.0, max: 60.0 }
+          - { band: "A",   score: 3, min: 35.0, max: 45.0 }
+          - { band: "Baa", score: 4, min: 25.0, max: 35.0 }
+
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 35
+    subfactors:
+      - id: debt_ebitda
+        name: Debt / EBITDA
+        metric: debt_ebitda_x
+        weight_pct: 15
+        direction: lower_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 0.5 }
+          - { band: "Aa",  score: 2, min: 0.5, max: 1.0 }
+          - { band: "A",   score: 3, min: 1.0, max: 2.0 }
+          - { band: "Baa", score: 4, min: 2.0, max: 3.0 }
+
+      - id: rcf_net_debt
+        name: RCF / Net Debt
+        metric: rcf_net_debt_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 75.0, max: null }
+          - { band: "Aa",  score: 2, min: 55.0, max: 75.0 }
+          - { band: "A",   score: 3, min: 40.0, max: 55.0 }
+          - { band: "Baa", score: 4, min: 25.0, max: 40.0 }
+
+      - id: ebit_interest
+        name: EBIT / Interest Expense
+        metric: ebit_interest_x
+        weight_pct: 10
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 25.0, max: null }
+          - { band: "Aa",  score: 2, min: 15.0, max: 25.0 }
+          - { band: "A",   score: 3, min: 8.0,  max: 15.0 }
+          - { band: "Baa", score: 4, min: 5.0,  max: 8.0 }
+
+  - id: factor_5_financial_policy
+    name: Financial Policy
+    weight_pct: 20
+    subfactors:
+      - id: financial_policy
+        name: Financial Policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 20
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Expected to have extremely conservative financial policies (including risk and liquidity management); very stable metrics; essentially no event risk that would cause a rating transition; and public commitment to a very strong credit profile over the long term.
+          - band: "Aa"
+            score: 2
+            description: Expected to have very conservative financial policies (including risk and liquidity management); stable metrics; minimal event risk that would cause a rating transition; and public commitment to a strong credit profile over the long term.
+          - band: "A"
+            score: 3
+            description: Expected to have predictable financial policies (including risk and liquidity management) that preserve creditor interests; although modest event risk exists, the effect on leverage is likely to be small and temporary; strong commitment to a solid credit profile.
+          - band: "Baa"
+            score: 4
+            description: Expected to have financial policies (including risk and liquidity management) that balance the interests of creditors and shareholders; some risk that debt-funded acquisitions or shareholder distributions could lead to a weaker credit profile.

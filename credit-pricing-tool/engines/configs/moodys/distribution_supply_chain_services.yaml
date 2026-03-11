@@ -1,0 +1,192 @@
+id: distribution_supply_chain_services
+name: Distribution and Supply Chain Services
+version: "9 Dec 2024"
+
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 20
+    subfactors:
+      - id: revenue
+        name: Revenue (USD Billion)
+        metric: revenue_usd_billion
+        weight_pct: 20
+        direction: higher_better
+        units: USD_billion
+        grid:
+          - { band: "Aaa", score: 1, min: 160.0, max: null }
+          - { band: "Aa",  score: 2, min: 85.0,  max: 160.0 }
+          - { band: "A",   score: 3, min: 35.0,  max: 85.0 }
+          - { band: "Baa", score: 4, min: 15.0,  max: 35.0 }
+          - { band: "Ba",  score: 5, min: 5.0,   max: 15.0 }
+          - { band: "B",   score: 6, min: 2.0,   max: 5.0 }
+          - { band: "Caa", score: 7, min: 0.5,   max: 2.0 }
+          - { band: "Ca",  score: 8, min: 0.0,   max: 0.5 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 300.0
+          ca_endpoint_value: 0.0
+
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 15
+    subfactors:
+      - id: business_profile
+        name: Business Profile (qualitative)
+        metric: business_profile_band
+        weight_pct: 15
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Very steady demand; unique/essential services; strong bargaining power; highly diversified end-markets; dominant share; strong barriers to entry.
+          - band: "Aa"
+            score: 2
+            description: Steady demand with moderate cycle exposure; high differentiation; well-established track record; diversified end-markets; limited vendor/customer concentration; strong barriers.
+          - band: "A"
+            score: 3
+            description: Mostly steady demand; good differentiation and track record; broad service mix; limited concentration; meaningful barriers; leadership in markets with limited competition.
+          - band: "Baa"
+            score: 4
+            description: Steady demand expected; moderate cycle exposure; some differentiation/track record; diversified in major markets; some concentration; barriers from switching costs; among leaders.
+          - band: "Ba"
+            score: 5
+            description: Steady demand near-term only; more cycle exposure; some differentiation but shorter track record; moderate concentration; limited barriers; strong niche player in some markets.
+          - band: "B"
+            score: 6
+            description: Demand evidence but long-term stability less certain; limited differentiation; relies on one segment; high vendor/customer concentration; weak barriers; small/local or niche player.
+          - band: "Caa"
+            score: 7
+            description: Newer offering with uncertain demand; little differentiation; one segment with high concentration; weak/no barriers; service has commodity traits; small player.
+          - band: "Ca"
+            score: 8
+            description: New offering with uncertain demand; no differentiation; one segment with very high concentration; no barriers; essentially commodity service; very small player/fragmented market.
+
+  - id: factor_3_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 15
+    subfactors:
+      - id: ebit_margin
+        name: EBIT Margin
+        metric: ebit_margin_pct
+        weight_pct: 15
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 20.0, max: null }
+          - { band: "Aa",  score: 2, min: 15.0, max: 20.0 }
+          - { band: "A",   score: 3, min: 10.0, max: 15.0 }
+          - { band: "Baa", score: 4, min: 7.0,  max: 10.0 }
+          - { band: "Ba",  score: 5, min: 4.0,  max: 7.0 }
+          - { band: "B",   score: 6, min: 1.0,  max: 4.0 }
+          - { band: "Caa", score: 7, min: 0.5,  max: 1.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 0.5 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 40.0
+          ca_endpoint_value: 0.0
+
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 35
+    subfactors:
+      - id: debt_ebitda
+        name: Debt / EBITDA
+        metric: debt_ebitda_x
+        weight_pct: 10
+        direction: lower_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 0.5 }
+          - { band: "Aa",  score: 2, min: 0.5, max: 1.0 }
+          - { band: "A",   score: 3, min: 1.0, max: 2.0 }
+          - { band: "Baa", score: 4, min: 2.0, max: 3.0 }
+          - { band: "Ba",  score: 5, min: 3.0, max: 4.5 }
+          - { band: "B",   score: 6, min: 4.5, max: 6.5 }
+          - { band: "Caa", score: 7, min: 6.5, max: 8.5 }
+          - { band: "Ca",  score: 8, min: 8.5, max: null }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 0.0
+          ca_endpoint_value: 12.0
+        special_cases:
+          - when: { debt_lt_0: true }
+            numeric_score: 0.5
+            note: "If Debt is negative, set numeric score to 0.5 (best)."
+
+      - id: ebitda_interest
+        name: EBITDA / Interest Expense
+        metric: ebitda_interest_x
+        weight_pct: 15
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 30.0, max: null }
+          - { band: "Aa",  score: 2, min: 20.0, max: 30.0 }
+          - { band: "A",   score: 3, min: 10.0, max: 20.0 }
+          - { band: "Baa", score: 4, min: 7.0,  max: 10.0 }
+          - { band: "Ba",  score: 5, min: 4.0,  max: 7.0 }
+          - { band: "B",   score: 6, min: 2.0,  max: 4.0 }
+          - { band: "Caa", score: 7, min: 1.0,  max: 2.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 1.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 40.0
+          ca_endpoint_value: 0.0
+
+      - id: rcf_net_debt
+        name: RCF / Net Debt
+        metric: rcf_net_debt_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 70.0, max: null }
+          - { band: "Aa",  score: 2, min: 50.0, max: 70.0 }
+          - { band: "A",   score: 3, min: 40.0, max: 50.0 }
+          - { band: "Baa", score: 4, min: 25.0, max: 40.0 }
+          - { band: "Ba",  score: 5, min: 15.0, max: 25.0 }
+          - { band: "B",   score: 6, min: 8.0,  max: 15.0 }
+          - { band: "Caa", score: 7, min: 1.0,  max: 8.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 1.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 100.0
+          ca_endpoint_value: 0.0
+        special_cases:
+          - when: { net_debt_lt_0: true, rcf_gt_0: true }
+            numeric_score: 0.5
+            note: "If net debt is negative and RCF is positive, numeric score is 0.5."
+          - when: { net_debt_lt_0: true, rcf_lte_0: true }
+            numeric_score: 20.5
+            note: "If net debt is negative and RCF is negative/zero, numeric score is 20.5."
+
+  - id: factor_5_financial_policy
+    name: Financial Policy
+    weight_pct: 15
+    subfactors:
+      - id: financial_policy
+        name: Financial Policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 15
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Very conservative policies; strong liquidity/risk management; very stable metrics; negligible event risk; clear commitment to strong credit profile.
+          - band: "Aa"
+            score: 2
+            description: Conservative policies; stable metrics; low event risk; commitment to strong credit profile.
+          - band: "A"
+            score: 3
+            description: Predictable, creditor-friendly policies; modest event risk; leverage impact usually small/temporary; commitment to solid credit profile.
+          - band: "Baa"
+            score: 4
+            description: Balances creditors/shareholders; some risk of debt-funded actions or distributions weakening profile.
+          - band: "Ba"
+            score: 5
+            description: Leans toward shareholders; above-average financial risk from distributions, acquisitions, or capital structure shifts.
+          - band: "B"
+            score: 6
+            description: Shareholder-favouring policies; high financial risk from distributions/acquisitions or other major changes.
+          - band: "Caa"
+            score: 7
+            description: Policies create elevated restructuring risk across economic conditions.
+          - band: "Ca"
+            score: 8
+            description: Policies imply elevated restructuring risk even in healthy conditions.

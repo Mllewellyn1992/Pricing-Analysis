@@ -1,0 +1,248 @@
+id: homebuilding_property_development
+name: Homebuilding and Property Development
+version: "17 Sep 2025"
+
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 15
+    subfactors:
+      - id: revenue
+        name: Revenue (USD Billion)
+        metric: revenue_usd_billion
+        weight_pct: 15
+        direction: higher_better
+        units: USD_billion
+        grid:
+          - { band: "Aaa", score: 1, min: 100.0, max: null }
+          - { band: "Aa",  score: 2, min: 50.0, max: 100.0 }
+          - { band: "A",   score: 3, min: 25.0, max: 50.0 }
+          - { band: "Baa", score: 4, min: 10.0, max: 25.0 }
+          - { band: "Ba",  score: 5, min: 4.0, max: 10.0 }
+          - { band: "B",   score: 6, min: 1.5, max: 4.0 }
+          - { band: "Caa", score: 7, min: 0.5, max: 1.5 }
+          - { band: "Ca",  score: 8, min: 0.0, max: 0.5 }
+        endpoints_for_linear_scoring:
+          aa_endpoint_value: 150.0
+          ca_endpoint_value: 0.0
+
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 35
+    subfactors:
+      - id: market_position_diversification
+        name: Market Position and Diversification (qualitative)
+        metric: market_position_diversification_band
+        weight_pct: 15
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Very strong market position in multiple countries; and products are offered in a very wide variety of property types and customer segments.
+          - band: "Aa"
+            score: 2
+            description: Very strong market position in many large markets in a country; and products are offered in a wide variety of property types and customer segments.
+          - band: "A"
+            score: 3
+            description: Strong market position in many large markets in a country; products are offered in a wide variety of property types and customer segments.
+          - band: "Baa"
+            score: 4
+            description: Strong market position in many markets in a country; products are offered in many property types and customer segments.
+          - band: "Ba"
+            score: 5
+            description: Solid market position in several markets in a country; products are offered in several property types and customer segments.
+          - band: "B"
+            score: 6
+            description: Modest market position in a few markets in a country; products are offered in a few property types or customer segments.
+          - band: "Caa"
+            score: 7
+            description: Weak market position in a single market; company relies on a very small number of product types or customer segments.
+          - band: "Ca"
+            score: 8
+            description: Very weak market position in a small market; or company relies on a single product type or a single customer segment.
+
+      - id: business_strategy
+        name: Business Strategy (qualitative)
+        metric: business_strategy_band
+        weight_pct: 10
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Extremely conservative inventory management and funding strategy, with a very strong land bank and housing inventory that has no exposure to price declines because of mitigation measures.
+          - band: "Aa"
+            score: 2
+            description: Very conservative inventory management and funding strategy, with a strong land bank and housing inventory that has minimal exposure to price declines because of mitigation measures.
+          - band: "A"
+            score: 3
+            description: Conservative inventory management and funding strategy, with a strong land bank and housing inventory that has low exposure to price declines because of mitigation measures.
+          - band: "Baa"
+            score: 4
+            description: Somewhat conservative inventory management and funding strategy, with a solid land bank and housing inventory that has modest exposure to price declines because of mitigation measures.
+          - band: "Ba"
+            score: 5
+            description: Inventory management and funding strategy is balanced, with issuer having somewhat elevated exposure to price declines from a land bank and housing inventory that are sized to meet operational requirements.
+          - band: "B"
+            score: 6
+            description: Inventory management and funding strategy is somewhat speculative, with issuer having sizable exposure to price declines from a land bank and housing inventory that are moderately larger than operational requirements.
+          - band: "Caa"
+            score: 7
+            description: Inventory management and funding strategy is speculative, with issuer having material exposure to price declines from a land bank and housing inventory that are considerably larger than operational requirements.
+          - band: "Ca"
+            score: 8
+            description: Inventory management and funding strategy is very speculative and largely financed with debt, with issuer being highly vulnerable to price declines from a land bank and housing inventory that are excessive relative to operational requirements.
+
+      - id: market_characteristics
+        name: Market Characteristics (qualitative)
+        metric: market_characteristics_band
+        weight_pct: 10
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Extremely strong and sustainable end-user demand that is expected to exceed supply; extremely long track record of solid and stable property price growth, which is expected to continue; operates in a regulatory environment with a long and consistent track record of being extremely predictable, stable and favorable.
+          - band: "Aa"
+            score: 2
+            description: Very strong and sustainable end-user demand that is expected to exceed supply; very long track record of solid and stable property price growth, which is expected to continue; operates in a regulatory environment with a consistent track record of being extremely predictable, stable and favorable.
+          - band: "A"
+            score: 3
+            description: Strong and sustainable end-user demand that is expected to exceed supply; long track record of solid and stable property price growth, which is expected to continue; operates in a regulatory environment with a track record of being very predictable, stable and favorable.
+          - band: "Baa"
+            score: 4
+            description: Strong end-user demand that is expected to exceed supply; modest track record of solid and stable property price growth, which is expected to continue; operates in a regulatory environment with a track record of being somewhat stable and favorable.
+          - band: "Ba"
+            score: 5
+            description: Stable market dynamics, with end-user demand and supply expected to be largely in balance; property prices are expected to remain largely stable, with limited effect from speculative activity in the market; operates in a regulatory environment with a track record of being somewhat stable but neutral.
+          - band: "B"
+            score: 6
+            description: Stable market dynamics, but supply is expected to exceed end-user demand; property prices are expected to remain somewhat volatile, with some effect from speculative activity in the market; operates in a regulatory environment with a track record of being neutral, but with some potential for adverse change.
+          - band: "Caa"
+            score: 7
+            description: Weakening market dynamics, with supply expected to exceed end-user demand; property prices are expected to be volatile, with a material effect from speculative activity in the market; operates in a somewhat unpredictable regulatory environment with an adverse change likely.
+          - band: "Ca"
+            score: 8
+            description: Weak market dynamics, with supply exceeding end-user demand on a sustained basis; property prices are expected to decline steeply, with high levels of speculative activity in the market; operates in a highly unpredictable regulatory environment with significant adverse change occurring or highly likely.
+
+  - id: factor_3_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 10
+    subfactors:
+      - id: ebit_margin
+        name: EBIT Margin
+        metric: ebit_margin_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 60.0, max: null }
+          - { band: "Aa",  score: 2, min: 35.0, max: 60.0 }
+          - { band: "A",   score: 3, min: 25.0, max: 35.0 }
+          - { band: "Baa", score: 4, min: 20.0, max: 25.0 }
+          - { band: "Ba",  score: 5, min: 15.0, max: 20.0 }
+          - { band: "B",   score: 6, min: 10.0, max: 15.0 }
+          - { band: "Caa", score: 7, min: 5.0, max: 10.0 }
+          - { band: "Ca",  score: 8, min: 0.0, max: 5.0 }
+        endpoints_for_linear_scoring:
+          aa_endpoint_value: 85.0
+          ca_endpoint_value: 0.0
+
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 20
+    subfactors:
+      - id: ebit_interest
+        name: EBIT / Interest Expense
+        metric: ebit_interest_x
+        weight_pct: 5
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 20.0, max: null }
+          - { band: "Aa",  score: 2, min: 15.0, max: 20.0 }
+          - { band: "A",   score: 3, min: 10.0, max: 15.0 }
+          - { band: "Baa", score: 4, min: 5.0, max: 10.0 }
+          - { band: "Ba",  score: 5, min: 3.0, max: 5.0 }
+          - { band: "B",   score: 6, min: 1.25, max: 3.0 }
+          - { band: "Caa", score: 7, min: 0.5, max: 1.25 }
+          - { band: "Ca",  score: 8, min: 0.0, max: 0.5 }
+        endpoints_for_linear_scoring:
+          aa_endpoint_value: 30.0
+          ca_endpoint_value: 0.0
+
+      - id: debt_book_cap
+        name: Debt / Book Capitalisation
+        metric: debt_book_cap_pct
+        weight_pct: 10
+        direction: lower_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 20.0 }
+          - { band: "Aa",  score: 2, min: 20.0, max: 25.0 }
+          - { band: "A",   score: 3, min: 25.0, max: 30.0 }
+          - { band: "Baa", score: 4, min: 30.0, max: 40.0 }
+          - { band: "Ba",  score: 5, min: 40.0, max: 50.0 }
+          - { band: "B",   score: 6, min: 50.0, max: 65.0 }
+          - { band: "Caa", score: 7, min: 65.0, max: 80.0 }
+          - { band: "Ca",  score: 8, min: 80.0, max: null }
+        endpoints_for_linear_scoring:
+          aa_endpoint_value: 0.0
+          ca_endpoint_value: 100.0
+
+      - id: debt_ebitda
+        name: Debt / EBITDA
+        metric: debt_ebitda_x
+        weight_pct: 5
+        direction: lower_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 0.5 }
+          - { band: "Aa",  score: 2, min: 0.5, max: 1.0 }
+          - { band: "A",   score: 3, min: 1.0, max: 2.0 }
+          - { band: "Baa", score: 4, min: 2.0, max: 3.0 }
+          - { band: "Ba",  score: 5, min: 3.0, max: 4.5 }
+          - { band: "B",   score: 6, min: 4.5, max: 6.5 }
+          - { band: "Caa", score: 7, min: 6.5, max: 8.5 }
+          - { band: "Ca",  score: 8, min: 8.5, max: null }
+        endpoints_for_linear_scoring:
+          aa_endpoint_value: 0.0
+          ca_endpoint_value: 12.0
+        special_cases:
+          - when: { ebitda_lt_0: true }
+            band: "Ca"
+            score: 8
+            note: "Negative EBITDA => treated as 12x or worse (numeric 20.5)."
+
+  - id: factor_5_financial_policy
+    name: Financial Policy
+    weight_pct: 20
+    subfactors:
+      - id: financial_policy
+        name: Financial Policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 20
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Expected to have extremely conservative financial policies (including risk and liquidity management); very stable metrics; essentially no event risk that would cause a rating transition; and public commitment to a very strong credit profile over the long term.
+          - band: "Aa"
+            score: 2
+            description: Expected to have very conservative financial policies (including risk and liquidity management); stable metrics; minimal event risk that would cause a rating transition; and public commitment to a strong credit profile over the long term.
+          - band: "A"
+            score: 3
+            description: Expected to have predictable financial policies (including risk and liquidity management) that preserve creditor interests; although modest event risk exists, the effect on leverage is likely to be small and temporary; strong commitment to a solid credit profile.
+          - band: "Baa"
+            score: 4
+            description: Expected to have financial policies (including risk and liquidity management) that balance the interests of creditors and shareholders; some risk exists that debt-funded acquisitions or shareholder distributions could lead to a weaker credit profile.
+          - band: "Ba"
+            score: 5
+            description: Expected to have financial policies (including risk and liquidity management) that tend to favor shareholders over creditors; above-average financial risk resulting from shareholder distributions, acquisitions or other significant capital structure changes.
+          - band: "B"
+            score: 6
+            description: Expected to have financial policies (including risk and liquidity management) that favor shareholders over creditors; high of financial risk resulting from shareholder distributions, acquisitions or other significant capital structure changes.
+          - band: "Caa"
+            score: 7
+            description: Expected to have financial policies (including risk and liquidity management) that create elevated risk of debt restructuring in varied economic environments.
+          - band: "Ca"
+            score: 8
+            description: Expected to have financial policies (including risk and liquidity management) that create elevated risk of debt restructuring even in healthy economic environments.

@@ -1,0 +1,134 @@
+id: diversified_technology
+name: Diversified Technology
+version: "12 Sep 2025"
+notes:
+  - This scorecard exhibit in the source PDF shows factors totaling 80% weight.
+  - If your engine expects 100%, normalize factor weights at runtime.
+
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 20
+    subfactors:
+      - id: revenue
+        name: Revenue (USD Billion)
+        metric: revenue_usd_billion
+        weight_pct: 20
+        direction: higher_better
+        units: USD_billion
+        grid:
+          - { band: "Aaa", score: 1, min: 60.0, max: null }
+          - { band: "Aa",  score: 2, min: 30.0, max: 60.0 }
+          - { band: "A",   score: 3, min: 15.0, max: 30.0 }
+          - { band: "Baa", score: 4, min: 8.0, max: 15.0 }
+          - { band: "Ba",  score: 5, min: 3.0, max: 8.0 }
+          - { band: "B",   score: 6, min: 1.0, max: 3.0 }
+          - { band: "Caa", score: 7, min: 0.25, max: 1.0 }
+          - { band: "Ca",  score: 8, min: 0.0, max: 0.25 }
+
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 20
+    subfactors:
+      - id: business_profile
+        name: Business Profile (qualitative)
+        metric: business_profile_band
+        weight_pct: 20
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Expected volatility in results is almost non-existent. Supported by a commanding market position, entrenched cost effectiveness, technology advantages, and a well balanced global reach.
+          - band: "Aa"
+            score: 2
+            description: Very low expected volatility in results. Supported by a deeply entrenched and leading market position that is highly defensible through cost effectiveness and technology leadership with global exposure.
+          - band: "A"
+            score: 3
+            description: Low expected volatility in results. Supported by a strong market position, sustainable competitive advantages and solid diversity characteristics.
+          - band: "Baa"
+            score: 4
+            description: Moderate expected volatility in results. Supported by a solid market position with modest competitive advantages and solid diversity characteristics provide a buffer against sudden shifts in demand.
+          - band: "Ba"
+            score: 5
+            description: Products are largely undifferentiated and the marketplace is highly price competitive, exposing the company to periods of heightened volatility. Such exposure is tempered by an established market position and a favorable cost structure and fair diversity characteristics.
+          - band: "B"
+            score: 6
+            description: Products are undifferentiated, competition is intense and customers price sensitive making results highly volatile. Company does not have advantageous cost profile or other competitive advantage to mitigate.
+          - band: "Caa"
+            score: 7
+            description: Results are expected to be extremely volatile. Company has modest market presence, few competitive advantages or may have above average costs.
+          - band: "Ca"
+            score: 8
+            description: Near term results are difficult to predict with any degree of confidence. No material competitive advantage.
+
+  - id: factor_3_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 10
+    subfactors:
+      - id: ebit_margin
+        name: EBIT Margin
+        metric: ebit_margin_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 40.0, max: null }
+          - { band: "Aa",  score: 2, min: 30.0, max: 40.0 }
+          - { band: "A",   score: 3, min: 20.0, max: 30.0 }
+          - { band: "Baa", score: 4, min: 15.0, max: 20.0 }
+          - { band: "Ba",  score: 5, min: 10.0, max: 15.0 }
+          - { band: "B",   score: 6, min: 5.0, max: 10.0 }
+          - { band: "Caa", score: 7, min: 2.5, max: 5.0 }
+          - { band: "Ca",  score: 8, min: 0.0, max: 2.5 }
+
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 30
+    subfactors:
+      - id: ebitda_interest
+        name: EBITDA / Interest Expense
+        metric: ebitda_interest_x
+        weight_pct: 10
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 30.0, max: null }
+          - { band: "Aa",  score: 2, min: 20.0, max: 30.0 }
+          - { band: "A",   score: 3, min: 10.0, max: 20.0 }
+          - { band: "Baa", score: 4, min: 7.0, max: 10.0 }
+          - { band: "Ba",  score: 5, min: 4.0, max: 7.0 }
+          - { band: "B",   score: 6, min: 2.0, max: 4.0 }
+          - { band: "Caa", score: 7, min: 1.0, max: 2.0 }
+          - { band: "Ca",  score: 8, min: 0.0, max: 1.0 }
+
+      - id: fcf_debt
+        name: FCF / Debt
+        metric: fcf_debt_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 45.0, max: null }
+          - { band: "Aa",  score: 2, min: 35.0, max: 45.0 }
+          - { band: "A",   score: 3, min: 25.0, max: 35.0 }
+          - { band: "Baa", score: 4, min: 20.0, max: 25.0 }
+          - { band: "Ba",  score: 5, min: 10.0, max: 20.0 }
+          - { band: "B",   score: 6, min: 5.0, max: 10.0 }
+          - { band: "Caa", score: 7, min: 0.0, max: 5.0 }
+          - { band: "Ca",  score: 8, min: -1000000000.0, max: 0.0 }
+
+      - id: debt_ebitda
+        name: Debt / EBITDA
+        metric: debt_ebitda_x
+        weight_pct: 10
+        direction: lower_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 0.5 }
+          - { band: "Aa",  score: 2, min: 0.5, max: 1.0 }
+          - { band: "A",   score: 3, min: 1.0, max: 1.5 }
+          - { band: "Baa", score: 4, min: 1.5, max: 2.5 }
+          - { band: "Ba",  score: 5, min: 2.5, max: 4.0 }
+          - { band: "B",   score: 6, min: 4.0, max: 6.0 }
+          - { band: "Caa", score: 7, min: 6.0, max: 8.5 }
+          - { band: "Ca",  score: 8, min: 8.5, max: null }

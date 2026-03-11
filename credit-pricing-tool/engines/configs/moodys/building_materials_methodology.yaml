@@ -1,0 +1,270 @@
+id: building_materials_methodology
+name: Building Materials
+version: "12 Sep 2025"
+
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 10
+    subfactors:
+      - id: revenue
+        name: Revenue (USD Billion)
+        metric: revenue_usd_billion
+        weight_pct: 10
+        direction: higher_better
+        units: USD_billion
+        grid:
+          - { band: "Aaa", score: 1, min: 50.0, max: null }
+          - { band: "Aa",  score: 2, min: 30.0, max: 50.0 }
+          - { band: "A",   score: 3, min: 15.0, max: 30.0 }
+          - { band: "Baa", score: 4, min: 5.0,  max: 15.0 }
+          - { band: "Ba",  score: 5, min: 1.5,  max: 5.0 }
+          - { band: "B",   score: 6, min: 0.5,  max: 1.5 }
+          - { band: "Caa", score: 7, min: 0.25, max: 0.5 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 0.25 }   # < $0.25
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 100.0
+          ca_endpoint_value: 0.0
+
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 15
+    subfactors:
+      - id: business_profile
+        name: Business Profile (qualitative)
+        metric: business_profile_band
+        weight_pct: 15
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1, description: "Exceptional geographic diversity in emerging and developed countries on several continents; exclusive provider of extremely diverse group of products; extremely high barriers to entry in essentially all products; extremely high degree of vertical integration; and essentially no risk from carbon regulation and a potential competitive advantage." }
+          - { band: "Aa",  score: 2, description: "Excellent geographic diversity in emerging and developed countries on several continents; highly diverse group of products and No. 1 or No. 2 market positions in majority of products; very high barriers to entry in most product; very high degree of vertical integration; essentially no risk from carbon regulation." }
+          - { band: "A",   score: 3, description: "Very good geographic diversity in emerging and developed countries on at least two continents; well-diversified group of products and No. 1, No. 2 or No. 3 market positions in majority of products; high barriers to entry in most products; high degree of vertical integration; very limited risk from carbon regulation." }
+          - { band: "Baa", score: 4, description: "Good geographic diversity in emerging and developed countries on at least two continents; diverse group of products, with moderately strong market positions in majority of products; high barriers to entry in key products; somewhat high degree of vertical integration; limited carbon regulation risk." }
+          - { band: "Ba",  score: 5, description: "Moderate geographic diversity; moderately diverse group of products, with moderate market positions; moderately high barriers to entry in some products; moderate vertical integration; moderate carbon regulation risk." }
+          - { band: "B",   score: 6, description: "Low geographic diversity; product concentration or weak market positions; low barriers to entry in most products; limited vertical integration; high carbon regulation risk." }
+          - { band: "Caa", score: 7, description: "Regional or niche provider with high product concentration or very weak market positions; very low barriers to entry in most products; minimal vertical integration; or very high carbon regulation risk." }
+          - { band: "Ca",  score: 8, description: "Regional or niche provider with very high product concentration or extremely weak and eroding market positions; essentially no barriers to entry in essentially all product lines; essentially no vertical integration; or extremely high carbon regulation risk." }
+
+  - id: factor_3_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 20
+    subfactors:
+      - id: operating_margin
+        name: Operating Margin
+        metric: operating_margin_pct
+        weight_pct: 5
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 40.0, max: null }
+          - { band: "Aa",  score: 2, min: 30.0, max: 40.0 }
+          - { band: "A",   score: 3, min: 20.0, max: 30.0 }
+          - { band: "Baa", score: 4, min: 15.0, max: 20.0 }
+          - { band: "Ba",  score: 5, min: 10.0, max: 15.0 }
+          - { band: "B",   score: 6, min: 5.0,  max: 10.0 }
+          - { band: "Caa", score: 7, min: 2.5,  max: 5.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 2.5 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 60.0
+          ca_endpoint_value: 0.0
+
+      - id: operating_margin_stability
+        name: Operating Margin Stability (qualitative)
+        metric: operating_margin_stability_band
+        weight_pct: 10
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1, description: "Essentially no volatility of operating margin throughout cycles; essentially no revenue volatility; extremely diverse mix of residential, commercial and infrastructure end-markets; extremely high share of revenue from renovation; extremely strong record of quickly passing on price increases to customers; extremely low-cost operations with very significant structural cost advantages and a highly variable cost base." }
+          - { band: "Aa",  score: 2, description: "Very low volatility of operating margin throughout cycles; very low revenue volatility; highly diverse mix of residential, commercial and infrastructure end-markets; very high share of revenue from renovation; very strong record of quickly passing on price increases to customers; and very low-cost operations with significant structural cost advantages and a highly variable cost base." }
+          - { band: "A",   score: 3, description: "Low volatility of operating margin throughout cycles; low revenue volatility; well-diversified mix of residential, commercial and infrastructure end-markets; high share of revenue from renovation; strong record of quickly passing on price increases to customers; moderately low-cost operations with structural cost advantages and a variable cost base." }
+          - { band: "Baa", score: 4, description: "Moderate volatility of operating margin throughout cycles; moderate revenue volatility; diverse mix of residential, commercial and infrastructure end-markets; moderately high share of revenue from renovation; moderately strong record of quickly passing on price increases to customers; low-cost operations with some structural cost advantages and some variability in cost base." }
+          - { band: "Ba",  score: 5, description: "Somewhat elevated volatility of operating margin throughout cycles; somewhat elevated revenue volatility; business mix is fairly concentrated in residential and commercial end-markets with low exposure to infrastructure; moderately low share of revenue from renovation; moderately strong record of passing on price increases to customers, but with some time lag; moderately high-cost operations with no meaningful cost advantages but some variability in cost base." }
+          - { band: "B",   score: 6, description: "Substantial volatility of operating margin throughout cycles; substantial revenue volatility; business mix is very concentrated in residential and commercial end-markets with very low exposure to infrastructure; low share of revenue from renovation; weak record of passing on price increases to customers and with a time lag; high-cost operations with limited variability in cost base." }
+          - { band: "Caa", score: 7, description: "High volatility of operating margin throughout cycles; high revenue volatility; business mix is highly concentrated in residential and commercial end-markets with extremely low exposure to infrastructure; or extremely low share of revenue from renovation; very weak record of passing on price increases to customers; or very high-cost operations with very limited variability in cost base." }
+          - { band: "Ca",  score: 8, description: "Extremely high volatility of operating margin throughout cycles; extremely high revenue volatility; business mix is concentrated in residential and commercial end-markets with no exposure to infrastructure; or no revenue from renovation; extremely weak record of quickly passing on price increases to customers; or extremely high-cost operations with extremely limited variability in cost base." }
+
+      - id: ebit_avg_assets
+        name: EBIT / Average Assets
+        metric: ebit_avg_assets_pct
+        weight_pct: 5
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 25.0, max: null }
+          - { band: "Aa",  score: 2, min: 15.0, max: 25.0 }
+          - { band: "A",   score: 3, min: 10.0, max: 15.0 }
+          - { band: "Baa", score: 4, min: 7.5,  max: 10.0 }
+          - { band: "Ba",  score: 5, min: 4.0,  max: 7.5 }
+          - { band: "B",   score: 6, min: 2.0,  max: 4.0 }
+          - { band: "Caa", score: 7, min: 1.0,  max: 2.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 1.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 40.0
+          ca_endpoint_value: 0.0
+
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 40
+    subfactors:
+      - id: debt_book_cap
+        name: Debt / Book Capitalization
+        metric: debt_book_cap_pct
+        weight_pct: 10
+        direction: lower_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0,  max: 20.0 }
+          - { band: "Aa",  score: 2, min: 20.0, max: 30.0 }
+          - { band: "A",   score: 3, min: 30.0, max: 40.0 }
+          - { band: "Baa", score: 4, min: 40.0, max: 50.0 }
+          - { band: "Ba",  score: 5, min: 50.0, max: 70.0 }
+          - { band: "B",   score: 6, min: 70.0, max: 80.0 }
+          - { band: "Caa", score: 7, min: 80.0, max: 90.0 }
+          - { band: "Ca",  score: 8, min: 90.0, max: null }     # > 90%
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 0.0
+          ca_endpoint_value: 110.0
+        special_cases:
+          - when: { debt_book_cap_negative: true }
+            band: "Ca"
+            score: 8
+            note: "Negative Debt/Book Capitalization => numeric 20.5 (worst)."
+
+      - id: debt_ebitda
+        name: Debt / EBITDA
+        metric: debt_ebitda_x
+        weight_pct: 10
+        direction: lower_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 0.5 }
+          - { band: "Aa",  score: 2, min: 0.5, max: 1.0 }
+          - { band: "A",   score: 3, min: 1.0, max: 2.0 }
+          - { band: "Baa", score: 4, min: 2.0, max: 3.5 }
+          - { band: "Ba",  score: 5, min: 3.5, max: 4.5 }
+          - { band: "B",   score: 6, min: 4.5, max: 6.0 }
+          - { band: "Caa", score: 7, min: 6.0, max: 7.0 }
+          - { band: "Ca",  score: 8, min: 7.0, max: null }      # > 7x
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 0.0
+          ca_endpoint_value: 9.0
+        special_cases:
+          - when: { debt_ebitda_negative: true }
+            band: "Ca"
+            score: 8
+            note: "Negative Debt/EBITDA => numeric 20.5 (worst)."
+
+      - id: ebit_interest
+        name: EBIT / Interest Expense
+        metric: ebit_interest_x
+        weight_pct: 10
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 20.0, max: null }
+          - { band: "Aa",  score: 2, min: 15.0, max: 20.0 }
+          - { band: "A",   score: 3, min: 7.0,  max: 15.0 }
+          - { band: "Baa", score: 4, min: 4.5,  max: 7.0 }
+          - { band: "Ba",  score: 5, min: 3.0,  max: 4.5 }
+          - { band: "B",   score: 6, min: 1.0,  max: 3.0 }
+          - { band: "Caa", score: 7, min: 0.5,  max: 1.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 0.5 }      # < 0.5x
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 30.0
+          ca_endpoint_value: 0.0
+        special_cases:
+          - when: { ebit_negative: true }
+            band: "Ca"
+            score: 8
+            note: "Negative EBIT => numeric 20.5 (worst)."
+
+      - id: rcf_net_debt
+        name: RCF / Net Debt
+        metric: rcf_net_debt_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 70.0, max: null }
+          - { band: "Aa",  score: 2, min: 50.0, max: 70.0 }
+          - { band: "A",   score: 3, min: 35.0, max: 50.0 }
+          - { band: "Baa", score: 4, min: 20.0, max: 35.0 }
+          - { band: "Ba",  score: 5, min: 10.0, max: 20.0 }
+          - { band: "B",   score: 6, min: 5.0,  max: 10.0 }
+          - { band: "Caa", score: 7, min: 2.5,  max: 5.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 2.5 }      # < 2.5%
+        endpoints_for_linear_scoring_if_net_debt_positive:
+          aaa_endpoint_value: 90.0
+          ca_endpoint_value: 0.0
+        special_cases:
+          - when: { net_debt_lt_0: true, rcf_gt_0: true }
+            band: "Aaa"
+            score: 1
+            note: "Net debt negative and RCF positive => numeric 0.5 (best)."
+          - when: { net_debt_lt_0: true, rcf_lte_0: true }
+            band: "Ca"
+            score: 8
+            note: "Net debt negative and RCF <= 0 => numeric 20.5 (worst)."
+
+  - id: factor_5_financial_policy
+    name: Financial Policy
+    weight_pct: 15
+    subfactors:
+      - id: financial_policy
+        name: Financial Policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 15
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1, description: "Expected to have extremely conservative financial policies (including risk and liquidity management); very stable metrics; essentially no event risk that would cause a rating transition; and public commitment to a very strong credit profile over the long term." }
+          - { band: "Aa",  score: 2, description: "Expected to have very conservative financial policies (including risk and liquidity management); stable metrics; minimal event risk that would cause a rating transition; and public commitment to a strong credit profile over the long term." }
+          - { band: "A",   score: 3, description: "Expected to have predictable financial policies (including risk and liquidity management) that preserve creditor interests; although modest event risk exists, the effect on leverage is likely to be small and temporary; strong commitment to a solid credit profile." }
+          - { band: "Baa", score: 4, description: "Expected to have financial policies (including risk and liquidity management) that balance the interests of creditors and shareholders; some risk that debt-funded acquisitions or shareholder distributions could lead to a weaker credit profile." }
+          - { band: "Ba",  score: 5, description: "Expected to have financial policies (including risk and liquidity management) that tend to favor shareholders over creditors; above-average financial risk resulting from shareholder distributions, acquisitions or other significant capital structure changes." }
+          - { band: "B",   score: 6, description: "Expected to have financial policies (including risk and liquidity management) that favor shareholders over creditors; high financial risk resulting from shareholder distributions, acquisitions or other significant capital structure changes." }
+          - { band: "Caa", score: 7, description: "Expected to have financial policies (including risk and liquidity management) that create elevated risk of debt restructuring in varied economic environments." }
+          - { band: "Ca",  score: 8, description: "Expected to have financial policies (including risk and liquidity management) that create elevated risk of debt restructuring even in healthy economic environments." }
+
+# Cross-method numeric scales (for reference by the engine):
+numeric_scales:
+  qualitative_band_to_numeric:
+    Aaa: 1
+    Aa: 3
+    A: 6
+    Baa: 9
+    Ba: 12
+    B: 15
+    Caa: 18
+    Ca: 20
+  quantitative_numeric_ranges:
+    Aaa: { min: 0.5,  max: 1.5 }
+    Aa:  { min: 1.5,  max: 4.5 }
+    A:   { min: 4.5,  max: 7.5 }
+    Baa: { min: 7.5,  max: 10.5 }
+    Ba:  { min: 10.5, max: 13.5 }
+    B:   { min: 13.5, max: 16.5 }
+    Caa: { min: 16.5, max: 19.5 }
+    Ca:  { min: 19.5, max: 20.5 }
+
+score_to_rating:
+  - { min_score: 0.0,  max_score: 1.5,  rating: "Aaa" }
+  - { min_score: 1.5,  max_score: 2.5,  rating: "Aa1" }
+  - { min_score: 2.5,  max_score: 3.5,  rating: "Aa2" }
+  - { min_score: 3.5,  max_score: 4.5,  rating: "Aa3" }
+  - { min_score: 4.5,  max_score: 5.5,  rating: "A1"  }
+  - { min_score: 5.5,  max_score: 6.5,  rating: "A2"  }
+  - { min_score: 6.5,  max_score: 7.5,  rating: "A3"  }
+  - { min_score: 7.5,  max_score: 8.5,  rating: "Baa1"}
+  - { min_score: 8.5,  max_score: 9.5,  rating: "Baa2"}
+  - { min_score: 9.5,  max_score: 10.5, rating: "Baa3"}
+  - { min_score: 10.5, max_score: 11.5, rating: "Ba1" }
+  - { min_score: 11.5, max_score: 12.5, rating: "Ba2" }
+  - { min_score: 12.5, max_score: 13.5, rating: "Ba3" }
+  - { min_score: 13.5, max_score: 14.5, rating: "B1"  }
+  - { min_score: 14.5, max_score: 15.5, rating: "B2"  }
+  - { min_score: 15.5, max_score: 16.5, rating: "B3"  }
+  - { min_score: 16.5, max_score: 17.5, rating: "Caa1"}
+  - { min_score: 17.5, max_score: 18.5, rating: "Caa2"}
+  - { min_score: 18.5, max_score: 19.5, rating: "Caa3"}
+  - { min_score: 19.5, max_score: 20.5, rating: "Ca"  }
+  - { min_score: 20.5, max_score: 99.9, rating: "C"   }

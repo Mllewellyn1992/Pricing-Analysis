@@ -1,0 +1,7 @@
+.env
+*.pyc
+__pycache__/
+.rate_cache.json
+node_modules/
+.vite/
+dist/

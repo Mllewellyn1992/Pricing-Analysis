@@ -1,0 +1,144 @@
+id: corporate_method
+name: Corporate Method
+version: 1
+rating_scale:
+  - AAA
+  - AA+
+  - AA
+  - AA-
+  - A+
+  - A
+  - A-
+  - BBB+
+  - BBB
+  - BBB-
+  - BB+
+  - BB
+  - BB-
+  - B+
+  - B
+  - B-
+  - CCC+
+  - CCC
+  - CCC-
+  - CC
+  - C
+  - D
+business_risk_labels:
+  1: Excellent
+  2: Strong
+  3: Satisfactory
+  4: Fair
+  5: Weak
+  6: Vulnerable
+financial_risk_labels:
+  1: Minimal
+  2: Modest
+  3: Intermediate
+  4: Significant
+  5: Aggressive
+  6: Highly leveraged
+anchor_by_avg:
+  1: AAA
+  2: AA
+  3: A
+  4: BBB
+  5: BB
+  6: B
+cicra_matrix:
+  # rows = industry risk (1-6), cols = country risk (1-6)
+  - [1, 1, 1, 2, 4, 5]
+  - [2, 2, 2, 3, 4, 5]
+  - [2, 2, 3, 4, 5, 6]
+  - [3, 3, 3, 4, 5, 6]
+  - [3, 4, 4, 5, 5, 6]
+  - [4, 4, 5, 5, 6, 6]
+financial_risk_tables:
+  standard: &medial
+    FFO_to_debt_pct:
+      direction: higher_better
+      bands:
+      - { label: Minimal, min: 50.0, max: null }
+      - { label: Modest, min: 35.0, max: 50.0 }
+      - { label: Intermediate, min: 23.0, max: 35.0 }
+      - { label: Significant, min: 13.0, max: 23.0 }
+      - { label: Aggressive, min: 9.0, max: 13.0 }
+      - { label: Highly leveraged, min: null, max: 9.0 }
+    debt_to_EBITDA_x:
+      direction: lower_better
+      bands:
+      - { label: Minimal, min: null, max: 1.75 }
+      - { label: Modest, min: 1.75, max: 2.5 }
+      - { label: Intermediate, min: 2.5, max: 3.5 }
+      - { label: Significant, min: 3.5, max: 4.5 }
+      - { label: Aggressive, min: 4.5, max: 5.5 }
+      - { label: Highly leveraged, min: 5.5, max: null }
+    FFO_to_cash_interest_x:
+      direction: higher_better
+      bands:
+      - { label: Minimal, min: 10.5, max: null }
+      - { label: Modest, min: 7.5, max: 10.5 }
+      - { label: Intermediate, min: 5.0, max: 7.5 }
+      - { label: Significant, min: 3.0, max: 5.0 }
+      - { label: Aggressive, min: 1.75, max: 3.0 }
+      - { label: Highly leveraged, min: null, max: 1.75 }
+    EBITDA_to_interest_x:
+      direction: higher_better
+      bands:
+      - { label: Minimal, min: 14.0, max: null }
+      - { label: Modest, min: 9.0, max: 14.0 }
+      - { label: Intermediate, min: 5.0, max: 9.0 }
+      - { label: Significant, min: 2.75, max: 5.0 }
+      - { label: Aggressive, min: 1.75, max: 2.75 }
+      - { label: Highly leveraged, min: null, max: 1.75 }
+    CFO_to_debt_pct:
+      direction: higher_better
+      bands:
+      - { label: Minimal, min: 40.0, max: null }
+      - { label: Modest, min: 27.5, max: 40.0 }
+      - { label: Intermediate, min: 18.5, max: 27.5 }
+      - { label: Significant, min: 10.5, max: 18.5 }
+      - { label: Aggressive, min: 7.0, max: 10.5 }
+      - { label: Highly leveraged, min: null, max: 7.0 }
+    FOCF_to_debt_pct:
+      direction: higher_better
+      bands:
+      - { label: Minimal, min: 30.0, max: null }
+      - { label: Modest, min: 17.5, max: 30.0 }
+      - { label: Intermediate, min: 9.5, max: 17.5 }
+      - { label: Significant, min: 5.0, max: 9.5 }
+      - { label: Aggressive, min: 0.0, max: 5.0 }
+      - { label: Highly leveraged, min: null, max: 0.0 }
+    DCF_to_debt_pct:
+      direction: higher_better
+      bands:
+      - { label: Minimal, min: 18.0, max: null }
+      - { label: Modest, min: 11.0, max: 18.0 }
+      - { label: Intermediate, min: 6.5, max: 11.0 }
+      - { label: Significant, min: 2.5, max: 6.5 }
+      - { label: Aggressive, min: -11.0, max: 2.5 }
+      - { label: Highly leveraged, min: null, max: -11.0 }
+  medial: *medial
+  low: *medial
+modifiers:
+  financial_policy:
+    positive: 1
+    neutral: 0
+    negative: -1
+    fs4: -1
+    fs5: -2
+    fs6: -3
+  capital_structure:
+    very_positive: 1
+    positive: 1
+    neutral: 0
+    negative: -1
+    very_negative: -2
+  diversification:
+    positive: 1
+    neutral: 0
+    negative: -1
+  comparable_ratings:
+    positive: 1
+    neutral: 0
+    negative: -1

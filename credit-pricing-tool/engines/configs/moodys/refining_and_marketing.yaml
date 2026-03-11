@@ -1,0 +1,315 @@
+id: refining_and_marketing
+name: Refining and Marketing
+version: 5 Aug 2021
+factors:
+- id: factor_1_scale
+  name: Scale
+  weight_pct: 25
+  subfactors:
+  - id: number_large_scale_refineries
+    name: Number of Large-Scale Refineries
+    metric: large_scale_refineries_band
+    weight_pct: 10
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+      note: ≥ 15
+    - band: Aa
+      score: 2
+      note: 9 – 14
+    - band: A
+      score: 3
+      note: 6 – 8
+    - band: Baa
+      score: 4
+      note: 3 – 5
+    - band: Ba
+      score: 5
+      note: '2'
+    - band: B
+      score: 6
+      note: '1'
+    - band: Caa
+      score: 7
+      note: 0 and multiple smaller refineries
+    - band: Ca
+      score: 8
+      note: 0 and single small refinery
+    notes: This input is categorical at the low end (0 with multiple vs single small refinery), so treat as a user selection unless you model
+      that split explicitly.
+- id: factor_2_business_profile
+  name: Business Profile
+  weight_pct: 20
+  subfactors:
+  - id: business_profile
+    name: Business Profile (qualitative)
+    metric: business_profile_band
+    weight_pct: 20
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+      note: Industry risk not compatible with "Aa" rating
+    - band: Aa
+      score: 2
+      note: Industry risk not compatible with "Aa" rating
+    - band: A
+      score: 3
+      note: Very Good
+    - band: Baa
+      score: 4
+      note: Good
+    - band: Ba
+      score: 5
+      note: Average
+    - band: B
+      score: 6
+      note: Below Average
+    - band: Caa
+      score: 7
+      note: Weak
+    - band: Ca
+      score: 8
+      note: Threatening
+- id: factor_4_financial_policy
+  name: Financial Policy
+  weight_pct: 20
+  subfactors:
+  - id: financial_policy
+    name: Financial Policy (qualitative)
+    metric: financial_policy_band
+    weight_pct: 20
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+      note: Extremely conservative policies; very stable metrics; minimal event risk; strong long-term commitment
+    - band: Aa
+      score: 2
+      note: Very stable & conservative; minimal event risk; strong commitment over long term
+    - band: A
+      score: 3
+      note: Predictable policies that preserve creditor interests; modest event risk likely small/temporary
+    - band: Baa
+      score: 4
+      note: Policies balance interests of creditors & shareholders; some risk that debt-funded actions could weaken profile
+    - band: Ba
+      score: 5
+      note: Policies tend to favour shareholders; above-average financial risk from distributions/acquisitions/capital structure changes
+    - band: B
+      score: 6
+      note: Policies favour shareholders; high financial risk from distributions/acquisitions/significant capital structure changes
+    - band: Caa
+      score: 7
+      note: Policies create elevated risk of debt restructuring in varied economic environments
+    - band: Ca
+      score: 8
+      note: Policies create elevated risk of debt restructuring even in healthy environments
+- id: factor_5_leverage_coverage
+  name: Leverage and Coverage
+  weight_pct: 20
+  subfactors:
+  - id: ebit_interest_expense
+    name: EBIT / Interest Expense
+    metric: ebit_interest_x
+    weight_pct: 5
+    direction: higher_better
+    units: times
+    notes: Industry risk not compatible with "Aaa" or "Aa" rating for this metric (per scorecard).
+    grid:
+    - band: A
+      score: 3
+      min: 10.0
+      max: null
+    - band: Baa
+      score: 4
+      min: 5.0
+      max: 10.0
+    - band: Ba
+      score: 5
+      min: 2.5
+      max: 5.0
+    - band: B
+      score: 6
+      min: 1.0
+      max: 2.5
+    - band: Caa
+      score: 7
+      min: 0.5
+      max: 1.0
+    - band: Ca
+      score: 8
+      min: -1.0e+18
+      max: 0.5
+  - id: debt_ebitda
+    name: Debt / EBITDA
+    metric: debt_ebitda_x
+    weight_pct: 5
+    direction: lower_better
+    units: times
+    notes: Industry risk not compatible with "Aaa" or "Aa" rating for this metric (per scorecard). Footnote [1] applies.
+    grid:
+    - band: A
+      score: 3
+      min: 0.0
+      max: 2.0
+    - band: Baa
+      score: 4
+      min: 2.0
+      max: 3.0
+    - band: Ba
+      score: 5
+      min: 3.0
+      max: 4.0
+    - band: B
+      score: 6
+      min: 4.0
+      max: 6.0
+    - band: Caa
+      score: 7
+      min: 6.0
+      max: 8.0
+    - band: Ca
+      score: 8
+      min: 8.0
+      max: null
+    special_cases:
+    - when: debt == 0
+      override_band: A
+      note: 'Footnote [1]: When debt is zero, the score is A.'
+    - when: debt > 0 and ebitda < 0
+      override_band: Ca
+      note: 'Footnote [1]: When debt is positive and EBITDA is negative, the score is Ca.'
+  - id: rcf_debt
+    name: RCF / Debt
+    metric: rcf_debt_pct
+    weight_pct: 5
+    direction: higher_better
+    units: percent
+    notes: Industry risk not compatible with "Aaa" or "Aa" rating for this metric (per scorecard).
+    grid:
+    - band: A
+      score: 3
+      min: 40.0
+      max: null
+    - band: Baa
+      score: 4
+      min: 25.0
+      max: 40.0
+    - band: Ba
+      score: 5
+      min: 10.0
+      max: 25.0
+    - band: B
+      score: 6
+      min: 5.0
+      max: 10.0
+    - band: Caa
+      score: 7
+      min: 1.0
+      max: 5.0
+    - band: Ca
+      score: 8
+      min: -1.0e+18
+      max: 1.0
+  - id: debt_capitalization
+    name: Debt / Capitalization
+    metric: debt_capitalization_pct
+    weight_pct: 5
+    direction: lower_better
+    units: percent
+    notes: Industry risk not compatible with "Aaa" or "Aa" rating for this metric (per scorecard). Footnote [2] applies.
+    grid:
+    - band: A
+      score: 3
+      min: 0.0
+      max: 25.0
+    - band: Baa
+      score: 4
+      min: 25.0
+      max: 35.0
+    - band: Ba
+      score: 5
+      min: 35.0
+      max: 50.0
+    - band: B
+      score: 6
+      min: 50.0
+      max: 70.0
+    - band: Caa
+      score: 7
+      min: 70.0
+      max: 90.0
+    - band: Ca
+      score: 8
+      min: 90.0
+      max: null
+    special_cases:
+    - when: debt == 0
+      override_band: A
+      note: 'Footnote [2]: When debt is zero, the score is A.'
+    - when: debt > 0 and capitalization < 0
+      override_band: Ca
+      note: 'Footnote [2]: When debt is positive and capitalization is negative, the score is Ca.'
+score_to_rating:
+- min_score: 0.0
+  max_score: 1.5
+  rating: Aaa
+- min_score: 1.5
+  max_score: 2.5
+  rating: Aa1
+- min_score: 2.5
+  max_score: 3.5
+  rating: Aa2
+- min_score: 3.5
+  max_score: 4.5
+  rating: Aa3
+- min_score: 4.5
+  max_score: 5.5
+  rating: A1
+- min_score: 5.5
+  max_score: 6.5
+  rating: A2
+- min_score: 6.5
+  max_score: 7.5
+  rating: A3
+- min_score: 7.5
+  max_score: 8.5
+  rating: Baa1
+- min_score: 8.5
+  max_score: 9.5
+  rating: Baa2
+- min_score: 9.5
+  max_score: 10.5
+  rating: Baa3
+- min_score: 10.5
+  max_score: 11.5
+  rating: Ba1
+- min_score: 11.5
+  max_score: 12.5
+  rating: Ba2
+- min_score: 12.5
+  max_score: 13.5
+  rating: Ba3
+- min_score: 13.5
+  max_score: 14.5
+  rating: B1
+- min_score: 14.5
+  max_score: 15.5
+  rating: B2
+- min_score: 15.5
+  max_score: 16.5
+  rating: B3
+- min_score: 16.5
+  max_score: 17.5
+  rating: Caa1
+- min_score: 17.5
+  max_score: 18.5
+  rating: Caa2
+- min_score: 18.5
+  max_score: 19.5
+  rating: Caa3
+- min_score: 19.5
+  max_score: 99.9
+  rating: Ca

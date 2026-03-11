@@ -1,0 +1,178 @@
+id: automotive_suppliers
+name: Automotive Suppliers
+version: "9 Dec 2024"
+
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 10
+    subfactors:
+      - id: revenue
+        name: Revenue (USD Billion)
+        metric: revenue_usd_billion
+        weight_pct: 10
+        direction: higher_better
+        units: USD_billion
+        grid:
+          - { band: "Aaa", score: 1, min: 100.0, max: null }     # >= $100
+          - { band: "Aa",  score: 2, min: 50.0,  max: 100.0 }
+          - { band: "A",   score: 3, min: 25.0,  max: 50.0 }
+          - { band: "Baa", score: 4, min: 10.0,  max: 25.0 }
+          - { band: "Ba",  score: 5, min: 4.0,   max: 10.0 }
+          - { band: "B",   score: 6, min: 1.5,   max: 4.0 }
+          - { band: "Caa", score: 7, min: 0.5,   max: 1.5 }
+          - { band: "Ca",  score: 8, min: 0.0,   max: 0.5 }      # < $0.5
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 150.0   # $150bn or better => numeric 0.5
+          ca_endpoint_value: 0.0      # $0bn => numeric 20.5
+
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 15
+    subfactors:
+      - id: business_profile
+        name: Business Profile (qualitative)
+        metric: business_profile_band
+        weight_pct: 15
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1 }
+          - { band: "Aa",  score: 2 }
+          - { band: "A",   score: 3 }
+          - { band: "Baa", score: 4 }
+          - { band: "Ba",  score: 5 }
+          - { band: "B",   score: 6 }
+          - { band: "Caa", score: 7 }
+          - { band: "Ca",  score: 8 }
+
+  - id: factor_3_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 25
+    subfactors:
+      - id: ebit_margin
+        name: EBIT Margin
+        metric: ebit_margin_pct
+        weight_pct: 15
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 20.0, max: null }      # >= 20%
+          - { band: "Aa",  score: 2, min: 15.0, max: 20.0 }
+          - { band: "A",   score: 3, min: 10.0, max: 15.0 }
+          - { band: "Baa", score: 4, min: 7.0,  max: 10.0 }
+          - { band: "Ba",  score: 5, min: 4.0,  max: 7.0 }
+          - { band: "B",   score: 6, min: 1.0,  max: 4.0 }
+          - { band: "Caa", score: 7, min: 0.5,  max: 1.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 0.5 }       # < 0.5%
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 40.0    # 40% or better => numeric 0.5
+          ca_endpoint_value: 0.0      # 0% or worse => numeric 20.5
+
+      - id: free_cash_flow_stability
+        name: Free Cash Flow Stability (qualitative)
+        metric: free_cash_flow_stability_band
+        weight_pct: 10
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1 }
+          - { band: "Aa",  score: 2 }
+          - { band: "A",   score: 3 }
+          - { band: "Baa", score: 4 }
+          - { band: "Ba",  score: 5 }
+          - { band: "B",   score: 6 }
+          - { band: "Caa", score: 7 }
+          - { band: "Ca",  score: 8 }
+
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 30
+    subfactors:
+      - id: debt_ebitda
+        name: Debt / EBITDA
+        metric: debt_ebitda_x
+        weight_pct: 10
+        direction: lower_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 0.5 }        # <= 0.5x
+          - { band: "Aa",  score: 2, min: 0.5, max: 1.0 }
+          - { band: "A",   score: 3, min: 1.0, max: 1.5 }
+          - { band: "Baa", score: 4, min: 1.5, max: 2.5 }
+          - { band: "Ba",  score: 5, min: 2.5, max: 4.0 }
+          - { band: "B",   score: 6, min: 4.0, max: 6.0 }
+          - { band: "Caa", score: 7, min: 6.0, max: 8.5 }
+          - { band: "Ca",  score: 8, min: 8.5, max: null }      # > 8.5x
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 0.0     # 0x => numeric 0.5
+          ca_endpoint_value: 15.0     # 15x or worse => numeric 20.5
+        special_cases:
+          - when: { debt_ebitda_lt_0: true }
+            band: "Ca"
+            score: 8
+            note: "Negative Debt/EBITDA is treated as worst (numeric 20.5)."
+
+      - id: ebitda_interest_expense
+        name: EBITDA / Interest Expense
+        metric: ebitda_interest_x
+        weight_pct: 10
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 35.0, max: null }      # >= 35x
+          - { band: "Aa",  score: 2, min: 25.0, max: 35.0 }
+          - { band: "A",   score: 3, min: 15.0, max: 25.0 }
+          - { band: "Baa", score: 4, min: 10.0, max: 15.0 }
+          - { band: "Ba",  score: 5, min: 6.0,  max: 10.0 }
+          - { band: "B",   score: 6, min: 2.5,  max: 6.0 }
+          - { band: "Caa", score: 7, min: 1.0,  max: 2.5 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 1.0 }       # < 1x
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 45.0    # 45x or better => numeric 0.5
+          ca_endpoint_value: 0.0      # 0x or worse => numeric 20.5
+
+      - id: rcf_net_debt
+        name: RCF / Net Debt
+        metric: rcf_net_debt_pct
+        weight_pct: 10
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 80.0, max: null }      # >= 80%
+          - { band: "Aa",  score: 2, min: 60.0, max: 80.0 }
+          - { band: "A",   score: 3, min: 35.0, max: 60.0 }
+          - { band: "Baa", score: 4, min: 25.0, max: 35.0 }
+          - { band: "Ba",  score: 5, min: 15.0, max: 25.0 }
+          - { band: "B",   score: 6, min: 10.0, max: 15.0 }
+          - { band: "Caa", score: 7, min: 5.0,  max: 10.0 }
+          - { band: "Ca",  score: 8, min: 0.0,  max: 5.0 }       # < 5%
+        endpoints_for_linear_scoring_if_net_debt_positive:
+          aaa_endpoint_value: 100.0   # 100% or better => numeric 0.5
+          ca_endpoint_value: 0.0      # 0% or worse => numeric 20.5
+        special_cases:
+          - when: { net_debt_lt_0: true, rcf_gt_0: true }
+            band: "Aaa"
+            score: 1
+            note: "If net debt is negative and RCF is positive => numeric 0.5 (best)."
+          - when: { net_debt_lt_0: true, rcf_lte_0: true }
+            band: "Ca"
+            score: 8
+            note: "If net debt is negative and RCF is negative/zero => numeric 20.5 (worst)."
+
+  - id: factor_5_financial_policy
+    name: Financial Policy
+    weight_pct: 20
+    subfactors:
+      - id: financial_policy
+        name: Financial Policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 20
+        direction: qualitative
+        grid:
+          - { band: "Aaa", score: 1 }
+          - { band: "Aa",  score: 2 }
+          - { band: "A",   score: 3 }
+          - { band: "Baa", score: 4 }
+          - { band: "Ba",  score: 5 }
+          - { band: "B",   score: 6 }
+          - { band: "Caa", score: 7 }
+          - { band: "Ca",  score: 8 }

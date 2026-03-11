@@ -1,0 +1,250 @@
+id: independent_exploration_production
+name: Independent Exploration and Production
+version: "15 Dec 2022"
+
+factors:
+  - id: factor_1_scale
+    name: Scale
+    weight_pct: 20
+    subfactors:
+      - id: average_daily_production
+        name: Average Daily Production (Mboe/d)
+        metric: avg_daily_production_mboed
+        weight_pct: 10
+        direction: higher_better
+        units: Mboe_per_day
+        grid:
+          - { band: "Aaa", score: 1, min: 2750.0, max: null }
+          - { band: "Aa",  score: 2, min: 1400.0, max: 2750.0 }
+          - { band: "A",   score: 3, min: 800.0,  max: 1400.0 }
+          - { band: "Baa", score: 4, min: 300.0,  max: 800.0 }
+          - { band: "Ba",  score: 5, min: 80.0,   max: 300.0 }
+          - { band: "B",   score: 6, min: 20.0,   max: 80.0 }
+          - { band: "Caa", score: 7, min: 10.0,   max: 20.0 }
+          - { band: "Ca",  score: 8, min: 5.0,    max: 10.0 }
+          - { band: "C",   score: 9, min: 0.0,    max: 5.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 5000.0
+          c_endpoint_value: 0.0
+          note: "Per scorecard footnote: 5,000 Mboe/d maps to numeric 0.5; 0 maps to numeric 21.5 (for linear scoring)."
+
+      - id: proved_developed_reserves
+        name: Proved Developed (PD) Reserves (MMboe)
+        metric: pd_reserves_mmboe
+        weight_pct: 10
+        direction: higher_better
+        units: MMboe
+        grid:
+          - { band: "Aaa", score: 1, min: 8000.0, max: null }
+          - { band: "Aa",  score: 2, min: 5000.0, max: 8000.0 }
+          - { band: "A",   score: 3, min: 2200.0, max: 5000.0 }
+          - { band: "Baa", score: 4, min: 600.0,  max: 2200.0 }
+          - { band: "Ba",  score: 5, min: 150.0,  max: 600.0 }
+          - { band: "B",   score: 6, min: 25.0,   max: 150.0 }
+          - { band: "Caa", score: 7, min: 10.0,   max: 25.0 }
+          - { band: "Ca",  score: 8, min: 5.0,    max: 10.0 }
+          - { band: "C",   score: 9, min: 0.0,    max: 5.0 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 12000.0
+          c_endpoint_value: 0.0
+          note: "Per scorecard footnote: 12,000 MMboe maps to numeric 0.5; 0 maps to numeric 21.5 (for linear scoring)."
+
+  - id: factor_2_business_profile
+    name: Business Profile
+    weight_pct: 20
+    subfactors:
+      - id: business_profile
+        name: Business Profile (qualitative)
+        metric: business_profile_band
+        weight_pct: 20
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Extremely large and diversified hydrocarbon resource base; superior project execution capabilities underpinned by technological leadership.
+          - band: "Aa"
+            score: 2
+            description: Very large and diversified hydrocarbon resource base; very strong project and resource development execution capabilities underpinned by technological leadership.
+          - band: "A"
+            score: 3
+            description: Large and diversified hydrocarbon resource base; strong project and resource development execution capabilities underpinned by technological leadership.
+          - band: "Baa"
+            score: 4
+            description: Sizeable hydrocarbon resource base albeit with some geographic/resource type concentration; high operational control with good project execution capabilities on longer and shorter cycle investments.
+          - band: "Ba"
+            score: 5
+            description: Moderate hydrocarbon resource base with limited geographic/resource type diversification; with substantial operational control focused primarily on shorter cycle investments.
+          - band: "B"
+            score: 6
+            description: Small hydrocarbon resource base lacking geographic/resource type diversification; with meaningful operational control.
+          - band: "Caa"
+            score: 7
+            description: Very small hydrocarbon resource base concentrated in single region/resource type; with limited operator responsibilities or operational track record.
+          - band: "Ca"
+            score: 8
+            description: Very small hydrocarbon resource base concentrated in single region/resource type; with largely non-producing assets or no operator responsibilities.
+          - band: "C"
+            score: 9
+            description: Extremely small hydrocarbon resource base concentrated in single region/resource type; with almost all non-producing assets or no operator responsibilities.
+        notes:
+          - "Scorecard note [3]: if Business Profile score is in Aaa–Ba and issuer has other business(es) that add diversification, final Business Profile score may be one category higher than the E&P business alone."
+
+  - id: factor_3_profitability_efficiency
+    name: Profitability and Efficiency
+    weight_pct: 15
+    subfactors:
+      - id: leveraged_full_cycle_ratio
+        name: Leveraged Full-Cycle Ratio
+        metric: leveraged_full_cycle_ratio_x
+        weight_pct: 15
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 5.0,  max: null }
+          - { band: "Aa",  score: 2, min: 3.5,  max: 5.0 }
+          - { band: "A",   score: 3, min: 2.75, max: 3.5 }
+          - { band: "Baa", score: 4, min: 2.0,  max: 2.75 }
+          - { band: "Ba",  score: 5, min: 1.5,  max: 2.0 }
+          - { band: "B",   score: 6, min: 1.0,  max: 1.5 }
+          - { band: "Caa", score: 7, min: 0.5,  max: 1.0 }
+          - { band: "Ca",  score: 8, min: 0.25, max: 0.5 }
+          - { band: "C",   score: 9, min: 0.0,  max: 0.25 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 7.0
+          c_endpoint_value: 1.0
+          note: "Per scorecard footnote: 7x maps to numeric 0.5; 1x (or worse) maps to numeric 21.5 (for linear scoring)."
+        definition_note: Leveraged Full-Cycle Ratio = (realised price/boe - operating & hedging costs/boe) / (capital costs incl. capitalised 3-yr avg F&D costs/boe + interest expense incl. capitalised portion per boe).
+
+  - id: factor_4_leverage_coverage
+    name: Leverage and Coverage
+    weight_pct: 25
+    subfactors:
+      - id: ep_debt_per_avg_daily_production
+        name: E&P Debt / Average Daily Production
+        metric: ep_debt_per_avg_daily_production_usd_per_boe_d
+        weight_pct: 5
+        direction: lower_better
+        units: USD_per_boe_per_day
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0,  max: 4000.0 }
+          - { band: "Aa",  score: 2, min: 4000.0, max: 8000.0 }
+          - { band: "A",   score: 3, min: 8000.0, max: 12000.0 }
+          - { band: "Baa", score: 4, min: 12000.0, max: 18000.0 }
+          - { band: "Ba",  score: 5, min: 18000.0, max: 23000.0 }
+          - { band: "B",   score: 6, min: 23000.0, max: 29000.0 }
+          - { band: "Caa", score: 7, min: 29000.0, max: 35000.0 }
+          - { band: "Ca",  score: 8, min: 35000.0, max: 41000.0 }
+          - { band: "C",   score: 9, min: 41000.0, max: null }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 0.0
+          c_endpoint_value: 50000.0
+          note: "Per scorecard footnote: $0 maps to numeric 0.5; $50,000 (or worse) maps to numeric 21.5 (for linear scoring)."
+
+      - id: ep_debt_per_pd_reserves
+        name: E&P Debt / PD Reserves (boe)
+        metric: ep_debt_per_pd_reserves_usd_per_boe
+        weight_pct: 5
+        direction: lower_better
+        units: USD_per_boe
+        grid:
+          - { band: "Aaa", score: 1, min: 0.0, max: 1.0 }
+          - { band: "Aa",  score: 2, min: 1.0, max: 2.0 }
+          - { band: "A",   score: 3, min: 2.0, max: 4.0 }
+          - { band: "Baa", score: 4, min: 4.0, max: 6.0 }
+          - { band: "Ba",  score: 5, min: 6.0, max: 8.0 }
+          - { band: "B",   score: 6, min: 8.0, max: 11.0 }
+          - { band: "Caa", score: 7, min: 11.0, max: 14.0 }
+          - { band: "Ca",  score: 8, min: 14.0, max: 17.0 }
+          - { band: "C",   score: 9, min: 17.0, max: null }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 0.0
+          c_endpoint_value: 20.0
+          note: "Per scorecard footnote: $0 maps to numeric 0.5; $20 (or worse) maps to numeric 21.5 (for linear scoring)."
+
+      - id: rcf_debt
+        name: RCF / Debt
+        metric: rcf_debt_pct
+        weight_pct: 7.5
+        direction: higher_better
+        units: percent
+        grid:
+          - { band: "Aaa", score: 1, min: 100.0, max: null }
+          - { band: "Aa",  score: 2, min: 80.0,  max: 100.0 }
+          - { band: "A",   score: 3, min: 60.0,  max: 80.0 }
+          - { band: "Baa", score: 4, min: 40.0,  max: 60.0 }
+          - { band: "Ba",  score: 5, min: 25.0,  max: 40.0 }
+          - { band: "B",   score: 6, min: 10.0,  max: 25.0 }
+          - { band: "Caa", score: 7, min: 5.0,   max: 10.0 }
+          - { band: "Ca",  score: 8, min: 2.5,  max: 5.0 }
+          - { band: "C",   score: 9, min: 0.0,  max: 2.5 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 140.0
+          c_endpoint_value: 10.0
+          note: "Per scorecard footnote: 140% maps to numeric 0.5; 10% (or worse) maps to numeric 21.5 (for linear scoring)."
+
+      - id: ebitda_interest
+        name: EBITDA / Interest Expense
+        metric: ebitda_interest_x
+        weight_pct: 7.5
+        direction: higher_better
+        units: times
+        grid:
+          - { band: "Aaa", score: 1, min: 35.0, max: null }
+          - { band: "Aa",  score: 2, min: 25.0, max: 35.0 }
+          - { band: "A",   score: 3, min: 15.0, max: 25.0 }
+          - { band: "Baa", score: 4, min: 10.0, max: 15.0 }
+          - { band: "Ba",  score: 5, min: 6.0,  max: 10.0 }
+          - { band: "B",   score: 6, min: 2.5,  max: 6.0 }
+          - { band: "Caa", score: 7, min: 1.0,  max: 2.5 }
+          - { band: "Ca",  score: 8, min: 0.25, max: 1.0 }
+          - { band: "C",   score: 9, min: 0.0,  max: 0.25 }
+        endpoints_for_linear_scoring:
+          aaa_endpoint_value: 45.0
+          c_endpoint_value: 1.0
+          note: "Per scorecard footnote: 45x maps to numeric 0.5; 1x (or worse) maps to numeric 21.5 (for linear scoring)."
+
+  - id: factor_5_financial_policy
+    name: Financial Policy
+    weight_pct: 20
+    subfactors:
+      - id: financial_policy
+        name: Financial Policy (qualitative)
+        metric: financial_policy_band
+        weight_pct: 20
+        direction: qualitative
+        grid:
+          - band: "Aaa"
+            score: 1
+            description: Extremely conservative financial policies (incl. risk and liquidity management); very stable metrics; essentially no event risk causing a rating transition; public commitment to a very strong credit profile over the long term.
+          - band: "Aa"
+            score: 2
+            description: Very conservative financial policies (incl. risk and liquidity management); stable metrics; minimal event risk causing a rating transition; public commitment to a strong credit profile over the long term.
+          - band: "A"
+            score: 3
+            description: Predictable financial policies (incl. risk and liquidity management) that preserve creditor interests; modest event risk; leverage impact likely small and temporary; strong commitment to a solid credit profile.
+          - band: "Baa"
+            score: 4
+            description: Financial policies (incl. risk and liquidity management) balance interests of creditors and shareholders; some risk debt-funded acquisitions/shareholder distributions could lead to a weaker credit profile.
+          - band: "Ba"
+            score: 5
+            description: Financial policies (incl. risk and liquidity management) tend to favour shareholders over creditors; above-average financial risk from distributions, acquisitions or other significant capital structure changes.
+          - band: "B"
+            score: 6
+            description: Financial policies (incl. risk and liquidity management) favour shareholders over creditors; high financial risk from distributions, acquisitions or other significant capital structure changes.
+          - band: "Caa"
+            score: 7
+            description: Financial policies (incl. risk and liquidity management) create a material risk of debt restructuring in varied economic environments.
+          - band: "Ca"
+            score: 8
+            description: Financial policies (incl. risk and liquidity management) create elevated risk of debt restructuring even in healthy economic environments.
+          - band: "C"
+            score: 9
+            description: Financial policies (incl. risk and liquidity management) create imminent risk of debt restructuring.
+
+notching_factors:
+  - id: significant_natural_gas_operations
+    name: Significant Natural Gas Operations
+    range_notches:
+      - 0
+      - 3
+    note: Scorecard indicates a notching factor of 0–3 notches for significant natural gas operations.

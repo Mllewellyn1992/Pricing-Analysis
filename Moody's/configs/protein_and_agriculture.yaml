@@ -1,0 +1,407 @@
+id: protein_and_agriculture
+name: Protein and Agriculture
+version: 1
+factors:
+- id: scale
+  name: Scale
+  weight_pct: 10
+  subfactors:
+  - id: revenue_usd_billion
+    name: Revenue (USD Billion)
+    weight_pct: 10
+    metric: revenue_usd_billion
+    direction: higher_better
+    units: USD_billion
+    grid:
+    - band: Aaa
+      score: 1
+      min: 60.0
+      max: null
+      raw: '> 60.0'
+    - band: Aa
+      score: 2
+      min: 30.0
+      max: 60.0
+      raw: $30 - $60
+    - band: A
+      score: 3
+      min: 15.0
+      max: 30.0
+      raw: $15 - $30
+    - band: Baa
+      score: 4
+      min: 8.0
+      max: 15.0
+      raw: $8 - $15
+    - band: Ba
+      score: 5
+      min: 3.0
+      max: 8.0
+      raw: $3 - $8
+    - band: B
+      score: 6
+      min: 1.0
+      max: 3.0
+      raw: $1 - $3
+    - band: Caa
+      score: 7
+      min: 0.25
+      max: 1.0
+      raw: $0.25 - $1
+    - band: Ca
+      score: 8
+      min: 0.0
+      max: 0.25
+      raw: < $0.25
+- id: business_profile
+  name: Business Profile
+  weight_pct: 25
+  subfactors:
+  - id: geographic_diversification_pct
+    name: Geographic Diversification
+    weight_pct: 5
+    metric: geographic_diversification_pct
+    direction: qualitative
+    units: null
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+  - id: segment_diversification_pct
+    name: Segment Diversification
+    weight_pct: 5
+    metric: segment_diversification_pct
+    direction: qualitative
+    units: null
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+  - id: market_position_global_player_global_player_global_player_global_player_expected_to_have_at_expected_to_have_a_3_expected_to_have_evolving_or_vulnerable_expected_to_have_1_expected_to_have_1_expected_to_have_1_expected_to_have_at_least_2_major_or_weaker_regional_small_regional_market_share_position_global_market_share_global_market_share_global_market_share_least_2_global_regional_market_share_market_share_a_market_share_or_be_a_due_to_corporate_in_all_key_business_in_all_key_business_in_all_key_business_market_share_in_all_in_key_segments_second_tier_market_niche_producer_with_restructuring_market_segments_with_at_segments_with_at_segments_with_at_key_business_participant_limited_customer_or_technology_least_triple_the_share_least_double_the_least_1_5x_the_share_of_segments_base_disruptions_shifting_of_2_player_share_of_2_player_the_2_player_customer_relationships
+    name: Market Position
+    weight_pct: 5
+    metric: market_position_global_player_global_player_global_player_global_player_expected_to_have_at_expected_to_have_a_3_expected_to_have_evolving_or_vulnerable_expected_to_have_1_expected_to_have_1_expected_to_have_1_expected_to_have_at_least_2_major_or_weaker_regional_small_regional_market_share_position_global_market_share_global_market_share_global_market_share_least_2_global_regional_market_share_market_share_a_market_share_or_be_a_due_to_corporate_in_all_key_business_in_all_key_business_in_all_key_business_market_share_in_all_in_key_segments_second_tier_market_niche_producer_with_restructuring_market_segments_with_at_segments_with_at_segments_with_at_key_business_participant_limited_customer_or_technology_least_triple_the_share_least_double_the_least_1_5x_the_share_of_segments_base_disruptions_shifting_of_2_player_share_of_2_player_the_2_player_customer_relationships_band
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+  - id: product_substantially_all_mostly_high_value_mostly_high_value_moderate_value_moderate_value_low_value_added_mostly_commodity_predominantly_portfolio_strong_value_added_added_strong_brands_added_solid_brands_added_some_solid_added_low_brand_mostly_commodity_products_little_or_no_commodity_very_strong_brands_and_high_innovation_and_good_innovation_regional_brands_and_strength_or_largely_like_products_value_added_products_little_or_no_and_very_high_capacity_capacity_some_innovation_commoditized_or_vulnerable_to_products_highly_value_added_innovation_capacity_capacity_with_vulnerable_to_commodity_cycles_vulnerable_to_products_extremely_sensitivity_to_commodity_cycles_new_competition_or_competition_vulnerable_to_competition_or_competition_or_consumption_trends_commodity_cycles_or_competition_consumption_trends_consumption_trends_consumption_trends_commodity_cycles_or_consumption_trends
+    name: Product Strength
+    weight_pct: 10
+    metric: product_substantially_all_mostly_high_value_mostly_high_value_moderate_value_moderate_value_low_value_added_mostly_commodity_predominantly_portfolio_strong_value_added_added_strong_brands_added_solid_brands_added_some_solid_added_low_brand_mostly_commodity_products_little_or_no_commodity_very_strong_brands_and_high_innovation_and_good_innovation_regional_brands_and_strength_or_largely_like_products_value_added_products_little_or_no_and_very_high_capacity_capacity_some_innovation_commoditized_or_vulnerable_to_products_highly_value_added_innovation_capacity_capacity_with_vulnerable_to_commodity_cycles_vulnerable_to_products_extremely_sensitivity_to_commodity_cycles_new_competition_or_competition_vulnerable_to_competition_or_competition_or_consumption_trends_commodity_cycles_or_competition_consumption_trends_consumption_trends_consumption_trends_commodity_cycles_or_consumption_trends_band
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+- id: profitability_and_efficiency
+  name: Profitability and Efficiency
+  weight_pct: 10
+  subfactors:
+  - id: earnings_operating_profits_are_operating_profits_are_operating_profits_are_operating_profits_are_operating_profits_are_operating_profits_can_operating_profits_operating_profits_are_stability_extremely_stable_very_stable_and_very_stable_and_relatively_stable_over_relatively_predictable_be_volatile_and_can_be_volatile_and_volatile_and_and_no_potential_for_predictable_and_predictable_and_very_long_term_but_can_over_long_term_but_unpredictable_during_unpredictable_unpredictable_short_term_earnings_extremely_low_low_potential_for_vary_over_short_can_be_volatile_over_cyclical_downturns_during_cyclical_throughout_the_volatility_potential_for_short_short_term_earnings_periods_due_to_short_periods_during_may_generate_large_downturns_may_cycle_can_generate_term_earnings_volatility_due_to_business_or_cyclical_downturns_quarterly_operating_generate_large_losses_large_losses_that_can_volatility_business_or_commodity_cycles_may_generate_small_losses_usually_that_can_be_be_persistent_or_very_commodity_cycles_rational_industry_quarterly_operating_followed_by_equally_persistent_weak_weak_industry_supply_supply_discipline_losses_followed_by_a_strong_recoveries_industry_supply_discipline_or_weak_reliable_recovery_possibly_weak_discipline_or_weak_average_operating_rational_industry_industry_supply_average_operating_efficiency_supply_discipline_discipline_or_below_efficiency_average_operating_efficiency
+    name: Earnings Stability
+    weight_pct: 10
+    metric: earnings_operating_profits_are_operating_profits_are_operating_profits_are_operating_profits_are_operating_profits_are_operating_profits_can_operating_profits_operating_profits_are_stability_extremely_stable_very_stable_and_very_stable_and_relatively_stable_over_relatively_predictable_be_volatile_and_can_be_volatile_and_volatile_and_and_no_potential_for_predictable_and_predictable_and_very_long_term_but_can_over_long_term_but_unpredictable_during_unpredictable_unpredictable_short_term_earnings_extremely_low_low_potential_for_vary_over_short_can_be_volatile_over_cyclical_downturns_during_cyclical_throughout_the_volatility_potential_for_short_short_term_earnings_periods_due_to_short_periods_during_may_generate_large_downturns_may_cycle_can_generate_term_earnings_volatility_due_to_business_or_cyclical_downturns_quarterly_operating_generate_large_losses_large_losses_that_can_volatility_business_or_commodity_cycles_may_generate_small_losses_usually_that_can_be_be_persistent_or_very_commodity_cycles_rational_industry_quarterly_operating_followed_by_equally_persistent_weak_weak_industry_supply_supply_discipline_losses_followed_by_a_strong_recoveries_industry_supply_discipline_or_weak_reliable_recovery_possibly_weak_discipline_or_weak_average_operating_rational_industry_industry_supply_average_operating_efficiency_supply_discipline_discipline_or_below_efficiency_average_operating_efficiency_band
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+- id: leverage_and_coverage
+  name: Leverage and Coverage
+  weight_pct: 40
+  subfactors:
+  - id: debt_ebitda
+    name: Debt / EBITDA
+    weight_pct: 15
+    metric: debt_ebitda_x
+    direction: lower_better
+    units: times
+    grid:
+    - band: Aaa
+      score: 1
+      min: 0.0
+      max: 0.5
+      raw: < 0.5x
+    - band: Aa
+      score: 2
+      min: 0.5
+      max: 1.0
+      raw: 0.5x - 1x
+    - band: A
+      score: 3
+      min: 1.0
+      max: 2.0
+      raw: 1x - 2x
+    - band: Baa
+      score: 4
+      min: 2.0
+      max: 3.0
+      raw: 2x - 3x
+    - band: Ba
+      score: 5
+      min: 3.0
+      max: 4.0
+      raw: 3x - 4x
+    - band: B
+      score: 6
+      min: 4.0
+      max: 6.0
+      raw: 4x - 6x
+    - band: Caa
+      score: 7
+      min: 6.0
+      max: 8.0
+      raw: 6x - 8x
+    - band: Ca
+      score: 8
+      min: 8.0
+      max: null
+      raw: '> 8x'
+  - id: ebitda_interest_expense
+    name: EBITDA / Interest Expense
+    weight_pct: 15
+    metric: ebitda_interest_x
+    direction: higher_better
+    units: times
+    grid:
+    - band: Aaa
+      score: 1
+      min: 30.0
+      max: null
+      raw: '> 30.0x'
+    - band: Aa
+      score: 2
+      min: 20.0
+      max: 30.0
+      raw: 20x - 30x
+    - band: A
+      score: 3
+      min: 10.0
+      max: 20.0
+      raw: 10x - 20x
+    - band: Baa
+      score: 4
+      min: 7.0
+      max: 10.0
+      raw: 7x - 10x
+    - band: Ba
+      score: 5
+      min: 4.0
+      max: 7.0
+      raw: 4x - 7x
+    - band: B
+      score: 6
+      min: 2.0
+      max: 4.0
+      raw: 2x - 4x
+    - band: Caa
+      score: 7
+      min: 1.0
+      max: 2.0
+      raw: 1x - 2x
+    - band: Ca
+      score: 8
+      min: 0.0
+      max: 1.0
+      raw: < 1x
+  - id: rcf_net_debt
+    name: RCF / Net Debt
+    weight_pct: 10
+    metric: rcf_net_debt_pct
+    direction: higher_better
+    units: percent
+    grid:
+    - band: Aaa
+      score: 1
+      min: 70.0
+      max: null
+      raw: '> 70.0%'
+    - band: Aa
+      score: 2
+      min: 50.0
+      max: 70.0
+      raw: 50% - 70%
+    - band: A
+      score: 3
+      min: 40.0
+      max: 50.0
+      raw: 40% - 50%
+    - band: Baa
+      score: 4
+      min: 25.0
+      max: 40.0
+      raw: 25% - 40%
+    - band: Ba
+      score: 5
+      min: 15.0
+      max: 25.0
+      raw: 15% - 25%
+    - band: B
+      score: 6
+      min: 8.0
+      max: 15.0
+      raw: 8% - 15%
+    - band: Caa
+      score: 7
+      min: 1.0
+      max: 8.0
+      raw: 1% - 8%
+    - band: Ca
+      score: 8
+      min: 0.0
+      max: 1.0
+      raw: < 1%
+- id: financial_policy
+  name: Financial Policy
+  weight_pct: 15
+  subfactors:
+  - id: financial_policy
+    name: Financial Policy (qualitative)
+    weight_pct: 15
+    metric: financial_policy_band
+    direction: qualitative
+    grid:
+    - band: Aaa
+      score: 1
+    - band: Aa
+      score: 2
+    - band: A
+      score: 3
+    - band: Baa
+      score: 4
+    - band: Ba
+      score: 5
+    - band: B
+      score: 6
+    - band: Caa
+      score: 7
+    - band: Ca
+      score: 8
+score_to_rating:
+- min_score: 1.0
+  max_score: 1.5
+  rating: Aaa
+- min_score: 1.5
+  max_score: 2.5
+  rating: Aa1
+- min_score: 2.5
+  max_score: 3.5
+  rating: Aa2
+- min_score: 3.5
+  max_score: 4.5
+  rating: Aa3
+- min_score: 4.5
+  max_score: 5.5
+  rating: A1
+- min_score: 5.5
+  max_score: 6.5
+  rating: A2
+- min_score: 6.5
+  max_score: 7.5
+  rating: A3
+- min_score: 7.5
+  max_score: 8.5
+  rating: Baa1
+- min_score: 8.5
+  max_score: 9.5
+  rating: Baa2
+- min_score: 9.5
+  max_score: 10.5
+  rating: Baa3
+- min_score: 10.5
+  max_score: 11.5
+  rating: Ba1
+- min_score: 11.5
+  max_score: 12.5
+  rating: Ba2
+- min_score: 12.5
+  max_score: 13.5
+  rating: Ba3
+- min_score: 13.5
+  max_score: 14.5
+  rating: B1
+- min_score: 14.5
+  max_score: 15.5
+  rating: B2
+- min_score: 15.5
+  max_score: 16.5
+  rating: B3
+- min_score: 16.5
+  max_score: 17.5
+  rating: Caa1
+- min_score: 17.5
+  max_score: 18.5
+  rating: Caa2
+- min_score: 18.5
+  max_score: 19.5
+  rating: Caa3
+- min_score: 19.5
+  max_score: 99.9
+  rating: Ca
