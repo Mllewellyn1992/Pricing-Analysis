@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { analyzeFinancials } from '../api'
+import { analyzeFinancials, getAllProducts } from '../api'
 
 // Map backend extraction field names → frontend form field names
 const EXTRACTION_TO_FORM = {
@@ -111,11 +111,11 @@ const EMPTY_FORM = {
   preferredDividends: '',
   minorityDividends: '',
   sharebuybacks: '',
-  actualRate: '',
+  currentMargin: '',
   tenor: '3',
-  facilityType: 'corporate',
   selectedBank: '',
   selectedProduct: '',
+  selectedBaseRate: null,
 }
 
 function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
@@ -131,6 +131,56 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
   const [formData, setFormData] = useState({ ...EMPTY_FORM })
   const [autoFilledFields, setAutoFilledFields] = useState({})
   const [extractionSource, setExtractionSource] = useState(null)
+  const [bankProducts, setBankProducts] = useState([])
+  const [productsLoading, setProductsLoading] = useState(true)
+
+  // Fetch all bank products on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const products = await getAllProducts()
+        setBankProducts(products)
+      } catch (err) {
+        console.error('Failed to load bank products:', err)
+      } finally {
+        setProductsLoading(false)
+      }
+    }
+    fetchProducts()
+  }, [])
+
+  // Derived: unique banks and filtered products for selected bank
+  const availableBanks = [...new Set(bankProducts.map(p => p.bank))].sort()
+  const productsForBank = formData.selectedBank
+    ? bankProducts.filter(p => p.bank === formData.selectedBank)
+    : []
+
+  // When bank changes, reset product selection
+  const handleBankChange = (e) => {
+    const bank = e.target.value
+    setFormData(prev => ({
+      ...prev,
+      selectedBank: bank,
+      selectedProduct: '',
+      selectedBaseRate: null,
+    }))
+  }
+
+  // When product changes, set the base rate
+  const handleProductChange = (e) => {
+    const productName = e.target.value
+    const product = productsForBank.find(p => p.product_name === productName)
+    setFormData(prev => ({
+      ...prev,
+      selectedProduct: productName,
+      selectedBaseRate: product ? product.rate_pct : null,
+    }))
+  }
+
+  // Computed all-in rate
+  const margin = parseFloat(formData.currentMargin) || 0
+  const baseRate = formData.selectedBaseRate || 0
+  const allInRate = baseRate + margin
 
   // When extractedData arrives, pre-fill the form
   useEffect(() => {
@@ -455,41 +505,103 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
 
         {/* Facility Details */}
         {renderSection('Facility Details', 'facility', (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Actual Interest Rate (%)
-              </label>
-              <input
-                type="text"
-                name="actualRate"
-                value={formData.actualRate}
-                onChange={handleChange}
-                placeholder="e.g., 5.5"
-                className="input-field w-full"
-              />
+          <div className="space-y-6">
+            {/* Bank & Product Selection */}
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm font-medium text-gray-900 mb-3">Base Rate Selection</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Bank</label>
+                  <select
+                    value={formData.selectedBank}
+                    onChange={handleBankChange}
+                    className="input-field w-full"
+                    disabled={productsLoading}
+                  >
+                    <option value="">{productsLoading ? 'Loading banks...' : 'Select a bank'}</option>
+                    {availableBanks.map(bank => (
+                      <option key={bank} value={bank}>{bank}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Lending Product</label>
+                  <select
+                    value={formData.selectedProduct}
+                    onChange={handleProductChange}
+                    className="input-field w-full"
+                    disabled={!formData.selectedBank}
+                  >
+                    <option value="">{formData.selectedBank ? 'Select a product' : 'Select bank first'}</option>
+                    {productsForBank.map(p => (
+                      <option key={p.product_name} value={p.product_name}>
+                        {p.product_name} — {p.rate_pct.toFixed(2)}%
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Show selected base rate */}
+              {formData.selectedBaseRate != null && (
+                <div className="mt-3 p-3 bg-white border border-blue-300 rounded flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">Base Rate</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      {formData.selectedBank} — {formData.selectedProduct}
+                    </p>
+                  </div>
+                  <p className="text-2xl font-bold text-primary">{baseRate.toFixed(2)}%</p>
+                </div>
+              )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Facility Tenor (Years)
-              </label>
-              <select name="tenor" value={formData.tenor} onChange={handleChange} className="input-field w-full">
-                {[1, 2, 3, 4, 5].map((year) => (
-                  <option key={year} value={year}>{year} year{year > 1 ? 's' : ''}</option>
-                ))}
-              </select>
+            {/* Margin & Tenor */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Current Margin (%)
+                </label>
+                <p className="text-xs text-gray-500 mb-1">Your margin above the base rate</p>
+                <input
+                  type="text"
+                  name="currentMargin"
+                  value={formData.currentMargin}
+                  onChange={handleChange}
+                  placeholder="e.g., 2.5"
+                  className="input-field w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Facility Tenor (Years)
+                </label>
+                <select name="tenor" value={formData.tenor} onChange={handleChange} className="input-field w-full">
+                  {[1, 2, 3, 4, 5, 7, 10].map((year) => (
+                    <option key={year} value={year}>{year} year{year > 1 ? 's' : ''}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Facility Type
-              </label>
-              <select name="facilityType" value={formData.facilityType} onChange={handleChange} className="input-field w-full">
-                <option value="corporate">Corporate Loan</option>
-                <option value="working-capital">Working Capital</option>
-              </select>
-            </div>
+            {/* All-In Rate Summary */}
+            {formData.selectedBaseRate != null && margin > 0 && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm font-medium text-gray-900 mb-2">Your All-In Rate</p>
+                <div className="flex items-center gap-4 text-lg">
+                  <span className="text-gray-700">{baseRate.toFixed(2)}%</span>
+                  <span className="text-gray-400">+</span>
+                  <span className="text-gray-700">{margin.toFixed(2)}%</span>
+                  <span className="text-gray-400">=</span>
+                  <span className="text-2xl font-bold text-green-700">{allInRate.toFixed(2)}%</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Base rate + margin = all-in rate (this will be compared to the expected market rate)
+                </p>
+              </div>
+            )}
           </div>
         ))}
 

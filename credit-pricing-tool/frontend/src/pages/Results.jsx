@@ -119,25 +119,33 @@ function Results({ data, onNavigate }) {
       {/* Actual vs Expected Rate */}
       {renderMetricSection('Facility Pricing', 'comparison', (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="metric-box">
-              <p className="text-sm text-gray-600 mb-1">Base Rate (NZ)</p>
+              <p className="text-sm text-gray-600 mb-1">Base Rate</p>
               <p className="text-2xl font-bold text-gray-900">{baseRate.toFixed(2)}%</p>
+              {data.selectedBank && (
+                <p className="text-xs text-gray-500 mt-1">{data.selectedBank} — {data.selectedProduct}</p>
+              )}
             </div>
             <div className="metric-box">
-              <p className="text-sm text-gray-600 mb-1">Market Spread</p>
-              <p className="text-2xl font-bold text-gray-900">{(avgSpread / 100).toFixed(2)}%</p>
+              <p className="text-sm text-gray-600 mb-1">Your Margin</p>
+              <p className="text-2xl font-bold text-gray-900">{(data.currentMargin || 0).toFixed(2)}%</p>
             </div>
             <div className="metric-box">
-              <p className="text-sm text-gray-600 mb-1">Expected All-In</p>
+              <p className="text-sm text-gray-600 mb-1">Your All-In Rate</p>
+              <p className="text-2xl font-bold text-gray-900">{actualRate.toFixed(2)}%</p>
+            </div>
+            <div className="metric-box">
+              <p className="text-sm text-gray-600 mb-1">Expected Market Rate</p>
               <p className="text-2xl font-bold text-primary">{avgAllInRate.toFixed(2)}%</p>
+              <p className="text-xs text-gray-500 mt-1">Spread: {avgSpread.toFixed(0)} bps</p>
             </div>
           </div>
 
           <div className="border-t pt-6">
             <div className="flex items-end justify-between mb-4">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Actual All-In Rate</p>
+                <p className="text-sm text-gray-600 mb-1">Your All-In Rate (Base + Margin)</p>
                 <p className="text-3xl font-bold text-gray-900">{actualRate.toFixed(2)}%</p>
               </div>
               <div className="text-right">

@@ -47,9 +47,11 @@ export async function analyzeFinancials(formData) {
     financials.total_debt_mn = financials.st_debt_mn + financials.cpltd_mn + financials.lt_debt_net_mn + financials.capital_leases_mn
   }
 
-  const actualRate = parseFloat(formData.actualRate) || 0
+  // Compute all-in rate from base rate + margin
+  const baseRate = parseFloat(formData.selectedBaseRate) || 0
+  const currentMargin = parseFloat(formData.currentMargin) || 0
+  const allInRate = baseRate + currentMargin
   const tenor = parseInt(formData.tenor) || 3
-  const facilityType = formData.facilityType || 'corporate'
   const sectorId = formData.industry || 'technology_software_and_services'
 
   try {
@@ -60,10 +62,14 @@ export async function analyzeFinancials(formData) {
       body: JSON.stringify({
         financials,
         sector_id: sectorId,
-        actual_rate_pct: actualRate,
+        actual_rate_pct: allInRate,
         facility_tenor: tenor,
-        facility_type: facilityType,
-        base_rate_type: facilityType === 'working-capital' ? 'working_capital' : 'corporate',
+        facility_type: 'corporate',
+        base_rate_type: 'corporate',
+        base_rate_override: baseRate || undefined,
+        selected_bank: formData.selectedBank || undefined,
+        selected_product: formData.selectedProduct || undefined,
+        current_margin: currentMargin || undefined,
       }),
     })
 
@@ -88,13 +94,16 @@ export async function analyzeFinancials(formData) {
       _blended_rating: data.ratings?.blended_rating,
 
       // Pricing results (this is what the user sees)
-      baseRate: data.base_rate_pct,
+      baseRate: baseRate || data.base_rate_pct,
+      currentMargin: currentMargin,
       expectedSpreadMin: data.spread_min_bps,
       expectedSpreadMax: data.spread_max_bps,
       expectedRateMin: data.expected_rate_min,
       expectedRateMax: data.expected_rate_max,
       expectedRateMid: data.expected_rate_mid,
-      actualRate: data.actual_rate_pct,
+      actualRate: allInRate || data.actual_rate_pct,
+      selectedBank: formData.selectedBank,
+      selectedProduct: formData.selectedProduct,
       deltaBps: data.delta_bps,
       interpretation: data.interpretation,
 
