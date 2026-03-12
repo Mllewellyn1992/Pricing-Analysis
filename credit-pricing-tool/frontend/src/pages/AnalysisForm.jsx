@@ -1,7 +1,77 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { analyzeFinancials } from '../api'
 
-function AnalysisForm({ onResults }) {
+// Map backend extraction field names → frontend form field names
+const EXTRACTION_TO_FORM = {
+  revenue_mn: 'revenue',
+  ebit_mn: 'ebit',
+  depreciation_mn: 'depreciation',
+  amortization_mn: 'amortization',
+  interest_expense_mn: 'interestExpense',
+  cash_interest_paid_mn: 'cashInterestPaid',
+  cash_taxes_paid_mn: 'cashTaxesPaid',
+  total_debt_mn: 'totalDebt',
+  st_debt_mn: 'stDebt',
+  cpltd_mn: 'cpltd',
+  lt_debt_net_mn: 'ltDebt',
+  capital_leases_mn: 'capitalLeases',
+  cash_mn: 'cash',
+  cash_like_mn: 'cashLikeAssets',
+  total_equity_mn: 'totalEquity',
+  minority_interest_mn: 'minorityInterest',
+  deferred_taxes_mn: 'deferredTaxes',
+  cfo_mn: 'cfo',
+  capex_mn: 'capex',
+  common_dividends_mn: 'commonDividends',
+  preferred_dividends_mn: 'preferredDividends',
+  nwc_current_mn: 'nwcCurrent',
+  nwc_prior_mn: 'nwcPrior',
+  lt_operating_assets_current_mn: 'ltOperatingAssetsCurrent',
+  lt_operating_assets_prior_mn: 'ltOperatingAssetsPrior',
+  assets_current_mn: 'totalAssetsCurrent',
+  assets_prior_mn: 'totalAssetsPrior',
+  avg_capital_mn: 'avgCapital',
+}
+
+const EMPTY_FORM = {
+  companyName: '',
+  businessDescription: '',
+  industry: '',
+  revenue: '',
+  ebit: '',
+  depreciation: '',
+  amortization: '',
+  interestExpense: '',
+  cashInterestPaid: '',
+  cashTaxesPaid: '',
+  totalDebt: '',
+  stDebt: '',
+  cpltd: '',
+  ltDebt: '',
+  capitalLeases: '',
+  cash: '',
+  cashLikeAssets: '',
+  totalEquity: '',
+  minorityInterest: '',
+  deferredTaxes: '',
+  nwcCurrent: '',
+  nwcPrior: '',
+  ltOperatingAssetsCurrent: '',
+  ltOperatingAssetsPrior: '',
+  totalAssetsCurrent: '',
+  totalAssetsPrior: '',
+  cfo: '',
+  capex: '',
+  commonDividends: '',
+  preferredDividends: '',
+  minorityDividends: '',
+  sharebuybacks: '',
+  actualRate: '',
+  tenor: '3',
+  facilityType: 'corporate',
+}
+
+function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
   const [loading, setLoading] = useState(false)
   const [expandedSections, setExpandedSections] = useState({
     company: true,
@@ -11,43 +81,62 @@ function AnalysisForm({ onResults }) {
     facility: true,
   })
 
-  const [formData, setFormData] = useState({
-    companyName: '',
-    businessDescription: '',
-    industry: '',
-    revenue: '',
-    ebit: '',
-    depreciation: '',
-    amortization: '',
-    interestExpense: '',
-    cashInterestPaid: '',
-    cashTaxesPaid: '',
-    totalDebt: '',
-    stDebt: '',
-    cpltd: '',
-    ltDebt: '',
-    capitalLeases: '',
-    cash: '',
-    cashLikeAssets: '',
-    totalEquity: '',
-    minorityInterest: '',
-    deferredTaxes: '',
-    nwcCurrent: '',
-    nwcPrior: '',
-    ltOperatingAssetsCurrent: '',
-    ltOperatingAssetsPrior: '',
-    totalAssetsCurrent: '',
-    totalAssetsPrior: '',
-    cfo: '',
-    capex: '',
-    commonDividends: '',
-    preferredDividends: '',
-    minorityDividends: '',
-    sharebuybacks: '',
-    actualRate: '',
-    tenor: '3',
-    facilityType: 'corporate',
-  })
+  const [formData, setFormData] = useState({ ...EMPTY_FORM })
+
+  // Track which fields were auto-filled from extraction
+  const [autoFilledFields, setAutoFilledFields] = useState({})
+  const [extractionSource, setExtractionSource] = useState(null)
+
+  // When extractedData arrives, pre-fill the form
+  useEffect(() => {
+    if (extractedData && extractedData.fields) {
+      const fields = extractedData.fields
+      const confidence = extractedData.confidence || {}
+      const newFormData = { ...EMPTY_FORM }
+      const filled = {}
+
+      for (const [backendKey, value] of Object.entries(fields)) {
+        const formKey = EXTRACTION_TO_FORM[backendKey]
+        if (formKey && value != null && value !== 0) {
+          newFormData[formKey] = String(value)
+          filled[formKey] = {
+            value,
+            confidence: confidence[backendKey] || null,
+            source: backendKey,
+          }
+        }
+      }
+
+      // Try to set company name from filename
+      if (extractedData.fileName) {
+        const name = extractedData.fileName
+          .replace(/\.pdf$/i, '')
+          .replace(/[_-]/g, ' ')
+          .replace(/\d{4}$/g, '')
+          .trim()
+        if (name && !newFormData.companyName) {
+          newFormData.companyName = name
+        }
+      }
+
+      setFormData(newFormData)
+      setAutoFilledFields(filled)
+      setExtractionSource({
+        fileName: extractedData.fileName,
+        method: extractedData.method,
+        fieldCount: Object.keys(filled).length,
+      })
+
+      // Open all sections that have filled data
+      setExpandedSections({
+        company: true,
+        income: ['revenue', 'ebit', 'depreciation', 'amortization', 'interestExpense', 'cashInterestPaid', 'cashTaxesPaid'].some((k) => filled[k]),
+        balance: ['totalDebt', 'stDebt', 'cpltd', 'ltDebt', 'capitalLeases', 'cash', 'cashLikeAssets', 'totalEquity', 'minorityInterest', 'deferredTaxes', 'nwcCurrent', 'nwcPrior', 'totalAssetsCurrent', 'totalAssetsPrior'].some((k) => filled[k]),
+        cashflow: ['cfo', 'capex', 'commonDividends', 'preferredDividends'].some((k) => filled[k]),
+        facility: true,
+      })
+    }
+  }, [extractedData])
 
   const industries = [
     'Select an industry',
@@ -92,6 +181,13 @@ function AnalysisForm({ onResults }) {
       ...prev,
       [name]: value,
     }))
+    // If user edits an auto-filled field, mark it as manually modified
+    if (autoFilledFields[name]) {
+      setAutoFilledFields((prev) => ({
+        ...prev,
+        [name]: { ...prev[name], modified: true },
+      }))
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -106,6 +202,13 @@ function AnalysisForm({ onResults }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleClearForm = () => {
+    setFormData({ ...EMPTY_FORM })
+    setAutoFilledFields({})
+    setExtractionSource(null)
+    if (onClearExtracted) onClearExtracted()
   }
 
   const renderSection = (title, sectionKey, children) => (
@@ -125,30 +228,58 @@ function AnalysisForm({ onResults }) {
     </div>
   )
 
-  const renderInputGroup = (columns = 2) => (children) =>
-    <div className={`grid grid-cols-1 md:grid-cols-${columns} gap-4`}>
-      {children}
-    </div>
+  const renderInput = (label, name, placeholder = '') => {
+    const isAutoFilled = autoFilledFields[name] && !autoFilledFields[name].modified
+    const confidence = autoFilledFields[name]?.confidence
 
-  const renderInput = (label, name, placeholder = '') => (
-    <div key={name}>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
-      </label>
-      <input
-        type="text"
-        name={name}
-        value={formData[name]}
-        onChange={handleChange}
-        placeholder={placeholder}
-        className="input-field w-full"
-      />
-    </div>
-  )
+    return (
+      <div key={name}>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {label}
+          {isAutoFilled && (
+            <span className="ml-2 text-xs text-blue-600 font-normal">
+              (extracted{confidence ? ` • ${Math.round(confidence * 100)}% confidence` : ''})
+            </span>
+          )}
+        </label>
+        <input
+          type="text"
+          name={name}
+          value={formData[name]}
+          onChange={handleChange}
+          placeholder={placeholder}
+          className={`input-field w-full ${
+            isAutoFilled ? 'border-blue-300 bg-blue-50' : ''
+          }`}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="p-8">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Credit Analysis</h1>
+
+      {/* Extraction source banner */}
+      {extractionSource && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start justify-between">
+          <div>
+            <p className="text-sm font-medium text-blue-900">
+              Pre-filled from: {extractionSource.fileName}
+            </p>
+            <p className="text-xs text-blue-700 mt-1">
+              {extractionSource.fieldCount} fields extracted using {extractionSource.method} method.
+              Fields highlighted in blue were auto-populated. Review and adjust values before analyzing.
+            </p>
+          </div>
+          <button
+            onClick={handleClearForm}
+            className="text-xs text-blue-600 underline hover:text-blue-800 flex-shrink-0 ml-4"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="max-w-4xl">
         {/* Company Information */}
@@ -337,47 +468,9 @@ function AnalysisForm({ onResults }) {
             {loading ? 'Analyzing...' : 'Calculate Credit Spread'}
           </button>
           <button
-            type="reset"
+            type="button"
             className="btn-secondary px-8 py-3"
-            onClick={() =>
-              setFormData({
-                companyName: '',
-                businessDescription: '',
-                industry: '',
-                revenue: '',
-                ebit: '',
-                depreciation: '',
-                amortization: '',
-                interestExpense: '',
-                cashInterestPaid: '',
-                cashTaxesPaid: '',
-                totalDebt: '',
-                stDebt: '',
-                cpltd: '',
-                ltDebt: '',
-                capitalLeases: '',
-                cash: '',
-                cashLikeAssets: '',
-                totalEquity: '',
-                minorityInterest: '',
-                deferredTaxes: '',
-                nwcCurrent: '',
-                nwcPrior: '',
-                ltOperatingAssetsCurrent: '',
-                ltOperatingAssetsPrior: '',
-                totalAssetsCurrent: '',
-                totalAssetsPrior: '',
-                cfo: '',
-                capex: '',
-                commonDividends: '',
-                preferredDividends: '',
-                minorityDividends: '',
-                sharebuybacks: '',
-                actualRate: '',
-                tenor: '3',
-                facilityType: 'corporate',
-              })
-            }
+            onClick={handleClearForm}
           >
             Clear Form
           </button>

@@ -9,6 +9,7 @@ import Upload from './pages/Upload'
 function App() {
   const [currentHash, setCurrentHash] = useState(window.location.hash || '#/')
   const [analysisResults, setAnalysisResults] = useState(null)
+  const [extractedData, setExtractedData] = useState(null)
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -29,6 +30,11 @@ function App() {
     navigate('#/results')
   }
 
+  const handleExtractedData = (data) => {
+    setExtractedData(data)
+    navigate('#/analysis')
+  }
+
   const renderPage = () => {
     const page = currentHash.slice(2) || '/'
 
@@ -40,13 +46,19 @@ function App() {
       case 'dashboard':
         return <Dashboard onNavigate={navigate} />
       case 'analysis':
-        return <AnalysisForm onResults={handleAnalysisSubmit} />
+        return (
+          <AnalysisForm
+            onResults={handleAnalysisSubmit}
+            extractedData={extractedData}
+            onClearExtracted={() => setExtractedData(null)}
+          />
+        )
       case 'results':
         return <Results data={analysisResults} onNavigate={navigate} />
       case 'rates':
         return <BaseRates onNavigate={navigate} />
       case 'upload':
-        return <Upload onNavigate={navigate} />
+        return <Upload onNavigate={navigate} onUseExtractedData={handleExtractedData} />
       default:
         return <Landing onNavigate={navigate} />
     }
