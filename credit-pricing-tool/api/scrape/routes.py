@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from .scraper import get_cached_rates, compute_market_average, force_refresh
-from .bank_scrapers import scrape_all_bank_products
+from .bank_scrapers import scrape_all_bank_products, scrape_bkbm_swap_rates, scrape_bkbm_swap_history
 from .rate_store import (
     save_snapshot,
     get_latest_snapshot,
@@ -308,3 +308,63 @@ def get_banks_summary():
         result.append(bank_data)
 
     return sorted(result, key=lambda x: x["bank"])
+
+
+# ─── Wholesale Rates (BKBM, Swap, Government Bonds) ───────────────────────────
+
+
+@router.get("/rates/wholesale")
+def get_wholesale_rates(
+    history_days: int = Query(90, description="Number of days of history for charts")
+):
+    """
+    Get BKBM and swap rates with historical data for charting.
+
+    Returns:
+    {
+        "latest_rates": [
+            {
+                "rate_name": "BKBM 3 Month",
+                "rate_pct": 4.25,
+                "tenor": "3M",
+                "rate_type": "bkbm",
+                "date": "2026-03-10",
+                "source": "RBNZ B1 daily series"
+            },
+            ...
+        ],
+        "history": {
+            "bkbm": [
+                {"date": "2026-03-10", "1M": 4.10, "2M": 4.15, "3M": 4.20, "6M": 4.30},
+                ...
+            ],
+            "swap": [
+                {"date": "2026-03-10", "1Y": 3.90, "2Y": 3.95, "3Y": 4.00, "5Y": 4.10, "7Y": 4.20, "10Y": 4.30},
+                ...
+            ]
+        },
+        "scraped_at": "ISO timestamp",
+        "source": "RBNZ B1 daily series"
+    }
+    """
+    try:
+        # Fetch latest rates
+        latest_rates = scrape_bkbm_swap_rates()
+
+        # Fetch history for charting
+        history = scrape_bkbm_swap_history(days=history_days)
+
+        return {
+            "latest_rates": latest_rates,
+            "history": history,
+            "history_days": history_days,
+            "scraped_at": datetime.utcnow().isoformat() + "Z",
+            "source": "RBNZ B1 daily series",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get wholesale rates: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve wholesale rates: {str(e)}"
+        )

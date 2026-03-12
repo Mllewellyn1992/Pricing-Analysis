@@ -208,3 +208,72 @@ export async function classifySector(businessDescription) {
     throw error
   }
 }
+
+/**
+ * Get all lending products from all banks with optional filters.
+ * @param {string} bank - Optional: filter by bank name (e.g., 'ASB')
+ * @param {string} category - Optional: filter by category (e.g., 'business_lending')
+ * @returns {Promise<Array>} Array of product objects
+ */
+export async function getAllProducts(bank, category) {
+  try {
+    let url = `${API_BASE}/api/rates/products`
+    const params = new URLSearchParams()
+
+    if (bank) params.append('bank', bank)
+    if (category) params.append('category', category)
+
+    if (params.toString()) {
+      url += `?${params.toString()}`
+    }
+
+    const response = await fetch(url)
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching products:', error)
+    throw error
+  }
+}
+
+/**
+ * Get the current Official Cash Rate (OCR).
+ * @returns {Promise<Object>} OCR data with rate_pct, decision_date, source
+ */
+export async function getOCR() {
+  try {
+    const response = await fetch(`${API_BASE}/api/rates/ocr`)
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching OCR:', error)
+    throw error
+  }
+}
+
+/**
+ * Get wholesale rates (BKBM and swap rates) with historical data.
+ * @returns {Promise<Object>} Wholesale rates data with latest and historical rates
+ */
+export async function getWholesaleRates() {
+  try {
+    const response = await fetch(`${API_BASE}/api/rates/wholesale`)
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching wholesale rates:', error)
+    throw error
+  }
+}

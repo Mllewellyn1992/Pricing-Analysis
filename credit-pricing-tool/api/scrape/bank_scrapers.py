@@ -16,6 +16,8 @@ Sources:
 
 import re
 import json
+import csv
+import io
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -406,53 +408,317 @@ def scrape_ocr() -> Optional[Dict[str, Any]]:
 
 # ─── BKBM Swap Rates ──────────────────────────────────────────────────────────
 
+RBNZ_CSV_URL = "https://www.rbnz.govt.nz/-/media/project/sites/rbnz/files/statistics/series/b/b1/hb1-daily.csv"
+
+# BKBM tenor columns
+BKBM_TENORS = ["1 Month", "2 Month", "3 Month", "6 Month"]
+BKBM_TENOR_SHORT = {"1 Month": "1M", "2 Month": "2M", "3 Month": "3M", "6 Month": "6M"}
+
+# Swap tenor columns
+SWAP_TENORS = ["1 Year", "2 Year", "3 Year", "4 Year", "5 Year", "7 Year", "10 Year"]
+SWAP_TENOR_SHORT = {
+    "1 Year": "1Y",
+    "2 Year": "2Y",
+    "3 Year": "3Y",
+    "4 Year": "4Y",
+    "5 Year": "5Y",
+    "7 Year": "7Y",
+    "10 Year": "10Y",
+}
+
+# Government bond yield columns
+GOVT_BOND_TENORS = ["2 Year", "5 Year", "10 Year"]
+GOVT_BOND_TENOR_SHORT = {"2 Year": "2Y", "5 Year": "5Y", "10 Year": "10Y"}
+
+
+def _download_rbnz_csv() -> Optional[List[Dict[str, Any]]]:
+    """
+    Download and parse the RBNZ B1 daily interest rates CSV.
+
+    Returns a list of dicts with keys like:
+    - Date
+    - BKBM 1 Month, BKBM 2 Month, BKBM 3 Month, BKBM 6 Month
+    - Swap 1 Year, Swap 2 Year, Swap 3 Year, Swap 4 Year, Swap 5 Year, Swap 7 Year, Swap 10 Year
+    - Government Bond 2 Year, 5 Year, 10 Year (or similar)
+    """
+    try:
+        resp = httpx.get(RBNZ_CSV_URL, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+        if resp.status_code != 200:
+            logger.warning(f"RBNZ CSV download returned {resp.status_code}")
+            return None
+
+        # Parse CSV
+        csv_text = resp.text
+        reader = csv.DictReader(io.StringIO(csv_text))
+
+        rows = []
+        for row in reader:
+            if row:
+                rows.append(row)
+
+        if not rows:
+            logger.warning("RBNZ CSV is empty")
+            return None
+
+        logger.debug(f"Downloaded {len(rows)} rows from RBNZ B1 CSV")
+        return rows
+
+    except Exception as e:
+        logger.error(f"Failed to download RBNZ CSV: {e}")
+        return None
+
+
+def _parse_rate_value(value_str: str) -> Optional[float]:
+    """
+    Parse a rate value from CSV, handling common formats.
+
+    Returns None if the value is missing, ".", "S", or otherwise unparseable.
+    """
+    if not value_str:
+        return None
+
+    value_str = value_str.strip()
+
+    # Skip special RBNZ markers
+    if value_str in [".", "S", "M", "N/A", ""]:
+        return None
+
+    try:
+        return float(value_str)
+    except ValueError:
+        return None
+
+
 def scrape_bkbm_swap_rates() -> List[Dict[str, Any]]:
     """
-    Attempt to fetch BKBM and swap rates.
+    Fetch the latest BKBM and swap rates from RBNZ B1 daily CSV.
 
-    The main sources (interest.co.nz charts) render data via JavaScript/Google Charts,
-    which we can't scrape without a headless browser.
-
-    This function attempts alternative sources. Returns empty list if unavailable.
-
-    TODO: Implement when a suitable data source is identified. Options:
-    - RBNZ B1/B2 statistical series (requires API access or CSV download)
-    - Headless browser automation for interest.co.nz charts
-    - Bloomberg/Reuters terminal data feed
+    Returns a list of dicts with structure:
+    {
+        "rate_name": "BKBM 3 Month" or "Swap 2 Year" etc,
+        "rate_pct": 4.25,
+        "tenor": "3M" or "2Y" etc,
+        "rate_type": "bkbm", "swap", or "govt_bond",
+        "date": "2026-03-10",
+        "source": "RBNZ B1 daily series",
+    }
     """
     rates = []
 
-    # Try RBNZ statistics page for wholesale rates
-    try:
-        resp = httpx.get(
-            "https://www.rbnz.govt.nz/statistics/series/exchange-and-interest-rates/b1-daily",
-            headers=HEADERS,
-            follow_redirects=True,
-            timeout=REQUEST_TIMEOUT,
-        )
-        if resp.status_code == 200:
-            # Try to parse if it's a data page
-            html = resp.text
-            # Look for swap rate data in tables
-            tables = re.findall(r"<table.*?</table>", html, re.DOTALL | re.IGNORECASE)
-            for table in tables:
-                rows = re.findall(r"<tr.*?>(.*?)</tr>", table, re.DOTALL)
-                for row in rows:
-                    cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL)
-                    cleaned = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
-                    # Look for swap/BKBM references
-                    row_text = " ".join(cleaned).lower()
-                    if "swap" in row_text or "bkbm" in row_text or "bill" in row_text:
-                        logger.info(f"BKBM data found: {cleaned}")
-                        # Parse and add to rates list
+    csv_data = _download_rbnz_csv()
+    if not csv_data:
+        logger.info("BKBM swap rates unavailable from RBNZ CSV")
+        return rates
 
-    except Exception as e:
-        logger.debug(f"RBNZ B1 data not available: {e}")
+    if not csv_data:
+        return rates
 
-    if not rates:
-        logger.info("BKBM swap rates not yet available (requires JS rendering or alternative data source)")
+    # Get the most recent row (CSV is typically in chronological order, so last row is latest)
+    latest_row = csv_data[-1]
+
+    # Extract date from first column (usually "Date" or similar)
+    date_str = None
+    for key in latest_row.keys():
+        if key.lower() in ["date", "dates"]:
+            date_str = latest_row[key].strip()
+            break
+
+    if not date_str:
+        logger.warning("Could not find date column in RBNZ CSV")
+        return rates
+
+    # Parse BKBM rates
+    for tenor in BKBM_TENORS:
+        # Try different column name patterns
+        col_names = [
+            f"BKBM {tenor}",
+            f"BKBM{tenor}",
+            f"Bank Bill ({tenor})",
+            f"Bank Bill Benchmark {tenor}",
+        ]
+
+        value = None
+        found_col = None
+        for col_name in col_names:
+            # Check for exact match first
+            if col_name in latest_row:
+                value = _parse_rate_value(latest_row[col_name])
+                found_col = col_name
+                break
+
+        # Fallback: try case-insensitive search
+        if value is None:
+            for key in latest_row.keys():
+                if tenor.lower() in key.lower() and "bkbm" in key.lower():
+                    value = _parse_rate_value(latest_row[key])
+                    found_col = key
+                    break
+
+        if value is not None:
+            rates.append({
+                "rate_name": f"BKBM {tenor}",
+                "rate_pct": round(value, 4),
+                "tenor": BKBM_TENOR_SHORT.get(tenor, tenor),
+                "rate_type": "bkbm",
+                "date": date_str,
+                "source": "RBNZ B1 daily series",
+            })
+
+    # Parse Swap rates
+    for tenor in SWAP_TENORS:
+        col_names = [
+            f"Swap {tenor}",
+            f"Swap{tenor}",
+            f"FXSwap {tenor}",
+            f"NZD Swap {tenor}",
+        ]
+
+        value = None
+        for col_name in col_names:
+            if col_name in latest_row:
+                value = _parse_rate_value(latest_row[col_name])
+                break
+
+        # Fallback: try case-insensitive search
+        if value is None:
+            for key in latest_row.keys():
+                if tenor.lower() in key.lower() and "swap" in key.lower():
+                    value = _parse_rate_value(latest_row[key])
+                    break
+
+        if value is not None:
+            rates.append({
+                "rate_name": f"Swap {tenor}",
+                "rate_pct": round(value, 4),
+                "tenor": SWAP_TENOR_SHORT.get(tenor, tenor),
+                "rate_type": "swap",
+                "date": date_str,
+                "source": "RBNZ B1 daily series",
+            })
+
+    # Parse Government Bond yields
+    for tenor in GOVT_BOND_TENORS:
+        col_names = [
+            f"Government Bond {tenor}",
+            f"Govt Bond {tenor}",
+            f"NZGB {tenor}",
+            f"Government {tenor}",
+        ]
+
+        value = None
+        for col_name in col_names:
+            if col_name in latest_row:
+                value = _parse_rate_value(latest_row[col_name])
+                break
+
+        # Fallback: try case-insensitive search
+        if value is None:
+            for key in latest_row.keys():
+                if tenor.lower() in key.lower() and "government" in key.lower():
+                    value = _parse_rate_value(latest_row[key])
+                    break
+
+        if value is not None:
+            rates.append({
+                "rate_name": f"Government Bond {tenor}",
+                "rate_pct": round(value, 4),
+                "tenor": GOVT_BOND_TENOR_SHORT.get(tenor, tenor),
+                "rate_type": "govt_bond",
+                "date": date_str,
+                "source": "RBNZ B1 daily series",
+            })
+
+    if rates:
+        logger.info(f"BKBM: scraped {len(rates)} wholesale rates")
+    else:
+        logger.info("No BKBM/swap rates found in RBNZ CSV (column names may not match)")
 
     return rates
+
+
+def scrape_bkbm_swap_history(days: int = 90) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Fetch the last N days of BKBM and swap rates for charting.
+
+    Returns:
+    {
+        "bkbm": [
+            {"date": "2026-03-10", "1M": 4.10, "2M": 4.15, "3M": 4.20, "6M": 4.30},
+            ...
+        ],
+        "swap": [
+            {"date": "2026-03-10", "1Y": 3.90, "2Y": 3.95, "3Y": 4.00, "5Y": 4.10, "7Y": 4.20, "10Y": 4.30},
+            ...
+        ]
+    }
+    """
+    history = {"bkbm": [], "swap": []}
+
+    csv_data = _download_rbnz_csv()
+    if not csv_data:
+        logger.info("BKBM history unavailable from RBNZ CSV")
+        return history
+
+    # Process the last N rows (most recent)
+    for row in csv_data[-days:]:
+        # Extract date
+        date_str = None
+        for key in row.keys():
+            if key.lower() in ["date", "dates"]:
+                date_str = row[key].strip()
+                break
+
+        if not date_str:
+            continue
+
+        # BKBM data
+        bkbm_entry = {"date": date_str}
+        for tenor in BKBM_TENORS:
+            value = None
+            for col_name in [f"BKBM {tenor}", f"BKBM{tenor}", f"Bank Bill ({tenor})"]:
+                if col_name in row:
+                    value = _parse_rate_value(row[col_name])
+                    break
+
+            # Fallback
+            if value is None:
+                for key in row.keys():
+                    if tenor.lower() in key.lower() and "bkbm" in key.lower():
+                        value = _parse_rate_value(row[key])
+                        break
+
+            if value is not None:
+                short_tenor = BKBM_TENOR_SHORT.get(tenor, tenor)
+                bkbm_entry[short_tenor] = round(value, 4)
+
+        if len(bkbm_entry) > 1:  # More than just the date
+            history["bkbm"].append(bkbm_entry)
+
+        # Swap data
+        swap_entry = {"date": date_str}
+        for tenor in SWAP_TENORS:
+            value = None
+            for col_name in [f"Swap {tenor}", f"Swap{tenor}", f"FXSwap {tenor}"]:
+                if col_name in row:
+                    value = _parse_rate_value(row[col_name])
+                    break
+
+            # Fallback
+            if value is None:
+                for key in row.keys():
+                    if tenor.lower() in key.lower() and "swap" in key.lower():
+                        value = _parse_rate_value(row[key])
+                        break
+
+            if value is not None:
+                short_tenor = SWAP_TENOR_SHORT.get(tenor, tenor)
+                swap_entry[short_tenor] = round(value, 4)
+
+        if len(swap_entry) > 1:  # More than just the date
+            history["swap"].append(swap_entry)
+
+    logger.info(f"BKBM history: {len(history['bkbm'])} BKBM days, {len(history['swap'])} swap days")
+    return history
 
 
 # ─── Master Scraper ────────────────────────────────────────────────────────────
@@ -511,8 +777,10 @@ def scrape_all_bank_products() -> Dict[str, Any]:
 
     # 5. BKBM swap rates (best effort)
     bkbm = []
+    bkbm_history = {}
     try:
         bkbm = scrape_bkbm_swap_rates()
+        bkbm_history = scrape_bkbm_swap_history()
     except Exception as e:
         errors.append(f"BKBM: {e}")
 
@@ -520,6 +788,7 @@ def scrape_all_bank_products() -> Dict[str, Any]:
         "products": all_products,
         "ocr": ocr,
         "bkbm_swap_rates": bkbm,
+        "bkbm_swap_history": bkbm_history,
         "banks_scraped": sorted(banks_scraped),
         "product_count": len(all_products),
         "scraped_at": datetime.utcnow().isoformat() + "Z",

@@ -1,140 +1,542 @@
 import { useState, useEffect } from 'react'
-import { getBaseRates } from '../api'
+import { getAllProducts, getOCR, getWholesaleRates } from '../api'
+
+/**
+ * Simple SVG line chart component for rates over time
+ */
+function SimpleLineChart({ data, lines, width = 700, height = 300, title }) {
+  if (!data || data.length === 0) {
+    return <div className="text-gray-500 text-center py-8">No data available</div>
+  }
+
+  const padding = { top: 20, right: 20, bottom: 40, left: 50 }
+  const chartWidth = width - padding.left - padding.right
+  const chartHeight = height - padding.top - padding.bottom
+
+  // Find min/max rates across all lines
+  let minRate = Infinity
+  let maxRate = -Infinity
+  lines.forEach(line => {
+    data.forEach(d => {
+      if (d[line.key] !== undefined) {
+        minRate = Math.min(minRate, d[line.key])
+        maxRate = Math.max(maxRate, d[line.key])
+      }
+    })
+  })
+
+  const rateRange = maxRate - minRate || 1
+  const padding_rates = rateRange * 0.1
+
+  const scaleX = chartWidth / (data.length - 1 || 1)
+  const scaleY = chartHeight / (rateRange + padding_rates * 2)
+
+  const getX = (index) => padding.left + index * scaleX
+  const getY = (rate) => padding.top + chartHeight - (rate - minRate + padding_rates) * scaleY
+
+  const generatePath = (lineKey) => {
+    const points = data
+      .map((d, i) => {
+        if (d[lineKey] === undefined) return null
+        return `${getX(i)},${getY(d[lineKey])}`
+      })
+      .filter(Boolean)
+    return `M ${points.join(' L ')}`
+  }
+
+  // Format dates for x-axis
+  const xLabels = data.map(d => {
+    if (d.date) {
+      const date = new Date(d.date)
+      return date.toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' })
+    }
+    return ''
+  })
+
+  // Show every 3rd or 5th label to avoid crowding
+  const labelStep = Math.ceil(data.length / 4)
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg width={width} height={height} className="mx-auto">
+        {/* Grid lines */}
+        {[0, 1, 2, 3, 4].map((i) => {
+          const y = padding.top + (chartHeight / 4) * i
+          return (
+            <line
+              key={`grid-${i}`}
+              x1={padding.left}
+              y1={y}
+              x2={width - padding.right}
+              y2={y}
+              stroke="#e5e7eb"
+              strokeWidth="1"
+            />
+          )
+        })}
+
+        {/* X-axis */}
+        <line
+          x1={padding.left}
+          y1={padding.top + chartHeight}
+          x2={width - padding.right}
+          y2={padding.top + chartHeight}
+          stroke="#6b7280"
+          strokeWidth="2"
+        />
+
+        {/* Y-axis */}
+        <line
+          x1={padding.left}
+          y1={padding.top}
+          x2={padding.left}
+          y2={padding.top + chartHeight}
+          stroke="#6b7280"
+          strokeWidth="2"
+        />
+
+        {/* Y-axis labels and ticks */}
+        {[0, 1, 2, 3, 4].map((i) => {
+          const rate = minRate + (rateRange / 4) * i + padding_rates
+          const y = padding.top + chartHeight - ((rate - minRate) * scaleY)
+          return (
+            <g key={`y-label-${i}`}>
+              <line x1={padding.left - 5} y1={y} x2={padding.left} y2={y} stroke="#6b7280" />
+              <text
+                x={padding.left - 10}
+                y={y + 4}
+                textAnchor="end"
+                fontSize="12"
+                fill="#6b7280"
+              >
+                {rate.toFixed(2)}%
+              </text>
+            </g>
+          )
+        })}
+
+        {/* X-axis labels and ticks */}
+        {data.map((d, i) => {
+          if (i % labelStep !== 0 && i !== data.length - 1) return null
+          return (
+            <g key={`x-label-${i}`}>
+              <line
+                x1={getX(i)}
+                y1={padding.top + chartHeight}
+                x2={getX(i)}
+                y2={padding.top + chartHeight + 5}
+                stroke="#6b7280"
+              />
+              <text
+                x={getX(i)}
+                y={padding.top + chartHeight + 20}
+                textAnchor="middle"
+                fontSize="12"
+                fill="#6b7280"
+              >
+                {xLabels[i]}
+              </text>
+            </g>
+          )
+        })}
+
+        {/* Data lines */}
+        {lines.map((line) => (
+          <g key={line.key}>
+            <path
+              d={generatePath(line.key)}
+              fill="none"
+              stroke={line.color}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {/* Dots at each data point */}
+            {data.map((d, i) => {
+              if (d[line.key] === undefined) return null
+              return (
+                <circle
+                  key={`dot-${line.key}-${i}`}
+                  cx={getX(i)}
+                  cy={getY(d[line.key])}
+                  r="3"
+                  fill={line.color}
+                />
+              )
+            })}
+          </g>
+        ))}
+      </svg>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-6 mt-6 justify-center">
+        {lines.map((line) => (
+          <div key={line.key} className="flex items-center gap-2">
+            <div
+              className="w-4 h-4 rounded"
+              style={{ backgroundColor: line.color }}
+            />
+            <span className="text-sm font-medium text-gray-700">{line.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function BaseRates({ onNavigate }) {
-  const [rates, setRates] = useState(null)
+  const [allProducts, setAllProducts] = useState([])
+  const [ocrData, setOcrData] = useState(null)
+  const [wholesaleData, setWholesaleData] = useState(null)
+  const [selectedBank, setSelectedBank] = useState('')
+  const [selectedProduct, setSelectedProduct] = useState('')
   const [loading, setLoading] = useState(true)
-  const [lastUpdated, setLastUpdated] = useState(new Date())
+  const [error, setError] = useState(null)
 
+  // Fetch all data on mount
   useEffect(() => {
-    const fetchRates = async () => {
+    const fetchAllData = async () => {
       try {
-        const data = await getBaseRates()
-        setRates(data)
-      } catch (error) {
-        console.error('Error fetching rates:', error)
-        setRates(null)
+        setLoading(true)
+        setError(null)
+
+        const [products, ocr, wholesale] = await Promise.all([
+          getAllProducts(),
+          getOCR(),
+          getWholesaleRates(),
+        ])
+
+        setAllProducts(products || [])
+        setOcrData(ocr)
+        setWholesaleData(wholesale)
+
+        // Auto-select first bank if available
+        if (products && products.length > 0) {
+          const firstBank = products[0].bank
+          setSelectedBank(firstBank)
+          // Auto-select first product of that bank
+          const firstProduct = products.find(p => p.bank === firstBank)
+          if (firstProduct) {
+            setSelectedProduct(firstProduct.product_name)
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching data:', err)
+        setError(err.message)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchRates()
+    fetchAllData()
   }, [])
 
-  const defaultRates = [
-    {
-      bank: 'ANZ',
-      corporateRate: 5.45,
-      workingCapitalRate: 5.75,
-      logo: '🏦',
-    },
-    {
-      bank: 'ASB',
-      corporateRate: 5.40,
-      workingCapitalRate: 5.70,
-      logo: '🏦',
-    },
-    {
-      bank: 'BNZ',
-      corporateRate: 5.50,
-      workingCapitalRate: 5.80,
-      logo: '🏦',
-    },
-    {
-      bank: 'Westpac',
-      corporateRate: 5.48,
-      workingCapitalRate: 5.78,
-      logo: '🏦',
-    },
-    {
-      bank: 'Kiwibank',
-      corporateRate: 5.55,
-      workingCapitalRate: 5.85,
-      logo: '🏦',
-    },
-  ]
+  // Get unique banks
+  const banks = [...new Set(allProducts.map(p => p.bank))].sort()
 
-  const displayRates = rates || defaultRates
-  const ratesWithCorporate = displayRates.filter(r => r.corporateRate != null)
-  const ratesWithWC = displayRates.filter(r => r.workingCapitalRate != null)
-  const avgCorporate = ratesWithCorporate.length > 0
-    ? ratesWithCorporate.reduce((sum, r) => sum + r.corporateRate, 0) / ratesWithCorporate.length
-    : 0
-  const avgWorkingCap = ratesWithWC.length > 0
-    ? ratesWithWC.reduce((sum, r) => sum + r.workingCapitalRate, 0) / ratesWithWC.length
-    : 0
+  // Get products for selected bank
+  const productsForBank = selectedBank
+    ? allProducts.filter(p => p.bank === selectedBank).sort((a, b) =>
+        a.product_name.localeCompare(b.product_name)
+      )
+    : []
 
-  const handleRefresh = () => {
-    setLoading(true)
-    setTimeout(() => {
-      setRates(null)
-      setLastUpdated(new Date())
-      setLoading(false)
-    }, 1000)
+  // Get selected product details
+  const selected = allProducts.find(
+    p => p.bank === selectedBank && p.product_name === selectedProduct
+  )
+
+  // Group all products by bank for the table
+  const productsByBank = {}
+  allProducts.forEach(product => {
+    if (!productsByBank[product.bank]) {
+      productsByBank[product.bank] = []
+    }
+    productsByBank[product.bank].push(product)
+  })
+
+  const sortedBanks = Object.keys(productsByBank).sort()
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Loading rates data...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="p-8">
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            NZ Bank Base Rates
-          </h1>
-          <p className="text-gray-600">
-            Current corporate and working capital rates from major NZ banks
-          </p>
-        </div>
-        <button
-          onClick={handleRefresh}
-          disabled={loading}
-          className={`btn-secondary px-4 py-2 ${loading ? 'opacity-50' : ''}`}
-        >
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </button>
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          NZ Bank Base Rates
+        </h1>
+        <p className="text-gray-600">
+          Current lending rates from major NZ banks, official cash rate, and wholesale benchmarks
+        </p>
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="card p-6">
-          <p className="text-sm font-medium text-gray-600 mb-2">
-            Average Corporate Rate
-          </p>
-          <p className="text-4xl font-bold text-primary mb-2">
-            {avgCorporate.toFixed(2)}%
-          </p>
-          <div className="flex gap-4 text-xs">
-            {ratesWithCorporate
-              .slice(0, 3)
-              .map((r) => (
-                <span key={r.bank} className="text-gray-500">
-                  {r.bank}: {r.corporateRate.toFixed(2)}%
-                </span>
+      {error && (
+        <div className="card bg-red-50 border border-red-200 p-4 mb-6 text-red-700">
+          <p className="font-medium">Error loading rates</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Bank & Product Selector Section */}
+      <div className="card p-6 mb-8">
+        <h2 className="text-lg font-semibold text-gray-900 mb-6">
+          Select Your Base Rate
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Bank Selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Bank
+            </label>
+            <select
+              value={selectedBank}
+              onChange={(e) => {
+                const newBank = e.target.value
+                setSelectedBank(newBank)
+                // Auto-select first product of new bank
+                const firstProduct = allProducts.find(p => p.bank === newBank)
+                if (firstProduct) {
+                  setSelectedProduct(firstProduct.product_name)
+                }
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="">-- Select Bank --</option>
+              {banks.map(bank => (
+                <option key={bank} value={bank}>
+                  {bank}
+                </option>
               ))}
+            </select>
+          </div>
+
+          {/* Product Selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Product
+            </label>
+            <select
+              value={selectedProduct}
+              onChange={(e) => setSelectedProduct(e.target.value)}
+              disabled={!selectedBank}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100"
+            >
+              <option value="">-- Select Product --</option>
+              {productsForBank.map(product => (
+                <option key={product.product_name} value={product.product_name}>
+                  {product.product_name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        <div className="card p-6">
-          <p className="text-sm font-medium text-gray-600 mb-2">
-            Average Working Capital Rate
-          </p>
-          <p className="text-4xl font-bold text-primary mb-2">
-            {avgWorkingCap.toFixed(2)}%
-          </p>
-          <div className="flex gap-4 text-xs">
-            {ratesWithWC
-              .slice(0, 3)
-              .map((r) => (
-                <span key={r.bank} className="text-gray-500">
-                  {r.bank}: {r.workingCapitalRate.toFixed(2)}%
-                </span>
-              ))}
+        {/* Selected Rate Display */}
+        {selected && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <p className="text-sm font-medium text-gray-600 mb-1">Your Selected Base Rate</p>
+            <p className="text-5xl font-bold text-primary mb-2">
+              {selected.rate_pct.toFixed(2)}%
+            </p>
+            <div className="space-y-1 text-sm text-gray-600">
+              <p>
+                <span className="font-medium">Bank:</span> {selected.bank}
+              </p>
+              <p>
+                <span className="font-medium">Product:</span> {selected.product_name}
+              </p>
+              <p>
+                <span className="font-medium">Category:</span> {selected.category}
+              </p>
+              <p>
+                <span className="font-medium">Type:</span> {selected.rate_type}
+              </p>
+              {selected.source_url && (
+                <p>
+                  <span className="font-medium">Source:</span>{' '}
+                  <a
+                    href={selected.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    View Source
+                  </a>
+                </p>
+              )}
+              <p className="text-xs text-gray-500 pt-2">
+                Scraped: {new Date(selected.scraped_at).toLocaleDateString()}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Rates Table */}
+      {/* OCR Card */}
+      {ocrData && (
+        <div className="card p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Official Cash Rate (OCR)
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Current OCR</p>
+              <p className="text-4xl font-bold text-primary">
+                {ocrData.rate_pct.toFixed(2)}%
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Decision Date</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {ocrData.decision_date}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Source</p>
+              <p className="text-sm text-gray-700">
+                {ocrData.source}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BKBM Rates Chart */}
+      {wholesaleData?.latest?.bkbm && (
+        <div className="card p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">
+            BKBM Rates Over Time
+          </h2>
+
+          {wholesaleData.history?.bkbm && wholesaleData.history.bkbm.length > 0 ? (
+            <>
+              <SimpleLineChart
+                data={wholesaleData.history.bkbm}
+                lines={[
+                  { key: '1M', label: 'BKBM 1 Month', color: '#3b82f6' },
+                  { key: '2M', label: 'BKBM 2 Month', color: '#8b5cf6' },
+                  { key: '3M', label: 'BKBM 3 Month', color: '#06b6d4' },
+                  { key: '6M', label: 'BKBM 6 Month', color: '#f59e0b' },
+                ]}
+                width={700}
+                height={300}
+                title="BKBM Rates"
+              />
+
+              {/* Latest BKBM Values Table */}
+              <div className="mt-8 overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                        Tenor
+                      </th>
+                      <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+                        Rate (%)
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {wholesaleData.latest.bkbm.map(rate => (
+                      <tr key={rate.tenor} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-900 font-medium">
+                          {rate.tenor}
+                        </td>
+                        <td className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
+                          {rate.rate_pct.toFixed(3)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="text-gray-500 text-center py-8">No historical BKBM data available</p>
+          )}
+        </div>
+      )}
+
+      {/* Swap Rates Chart */}
+      {wholesaleData?.latest?.swap && (
+        <div className="card p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">
+            Swap Rates Over Time
+          </h2>
+
+          {wholesaleData.history?.swap && wholesaleData.history.swap.length > 0 ? (
+            <>
+              <SimpleLineChart
+                data={wholesaleData.history.swap}
+                lines={[
+                  { key: '1Y', label: 'Swap 1 Year', color: '#10b981' },
+                  { key: '2Y', label: 'Swap 2 Year', color: '#ef4444' },
+                  { key: '3Y', label: 'Swap 3 Year', color: '#6366f1' },
+                  { key: '5Y', label: 'Swap 5 Year', color: '#ec4899' },
+                  { key: '7Y', label: 'Swap 7 Year', color: '#14b8a6' },
+                  { key: '10Y', label: 'Swap 10 Year', color: '#f97316' },
+                ]}
+                width={700}
+                height={300}
+                title="Swap Rates"
+              />
+
+              {/* Latest Swap Values Table */}
+              <div className="mt-8 overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                        Tenor
+                      </th>
+                      <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+                        Rate (%)
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {wholesaleData.latest.swap.map(rate => (
+                      <tr key={rate.tenor} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-900 font-medium">
+                          {rate.tenor}
+                        </td>
+                        <td className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
+                          {rate.rate_pct.toFixed(3)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="text-gray-500 text-center py-8">No historical swap data available</p>
+          )}
+        </div>
+      )}
+
+      {/* All Bank Products Table */}
       <div className="card overflow-hidden mb-8">
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">
+            All Bank Products
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Complete listing of all available lending products from NZ banks
+          </p>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -142,121 +544,98 @@ function BaseRates({ onNavigate }) {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
                   Bank
                 </th>
-                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
-                  Corporate Loans (%)
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                  Product Name
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                  Category
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                  Type
                 </th>
                 <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
-                  Working Capital (%)
-                </th>
-                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
-                  Spread (bps)
+                  Rate (%)
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {displayRates.map((rate) => {
-                const corp = rate.corporateRate ?? 0
-                const wc = rate.workingCapitalRate ?? 0
-                const spread = (wc - corp) * 100
-                return (
-                  <tr key={rate.bank} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{rate.logo || '🏦'}</span>
-                        <span className="font-medium text-gray-900">
-                          {rate.bank}
+              {sortedBanks.map(bank => (
+                <React.Fragment key={bank}>
+                  {productsByBank[bank].map((product, idx) => (
+                    <tr
+                      key={`${bank}-${idx}`}
+                      className={`hover:bg-blue-50 transition-colors ${
+                        selected?.bank === bank && selected?.product_name === product.product_name
+                          ? 'bg-blue-100'
+                          : ''
+                      }`}
+                    >
+                      {idx === 0 && (
+                        <td
+                          rowSpan={productsByBank[bank].length}
+                          className="px-6 py-4 font-bold text-gray-900 bg-gray-50"
+                        >
+                          {bank}
+                        </td>
+                      )}
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {product.product_name}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {product.category}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {product.rate_type}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="inline-block px-3 py-1 bg-primary bg-opacity-10 text-primary rounded font-semibold text-sm">
+                          {product.rate_pct.toFixed(2)}%
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <p className="text-lg font-semibold text-gray-900">
-                        {rate.corporateRate != null ? `${corp.toFixed(2)}%` : '—'}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <p className="text-lg font-semibold text-gray-900">
-                        {rate.workingCapitalRate != null ? `${wc.toFixed(2)}%` : '—'}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                        {rate.corporateRate != null && rate.workingCapitalRate != null ? `${spread.toFixed(0)} bps` : '—'}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Rate Comparison Chart */}
-      <div className="card p-6 mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">
-          Corporate Rate Comparison
-        </h2>
-
-        <div className="space-y-6">
-          {displayRates.filter(r => r.corporateRate != null).map((rate) => {
-            const allCorpRates = displayRates.filter(r => r.corporateRate != null).map(r => r.corporateRate)
-            const minRate = Math.min(...allCorpRates)
-            const maxRate = Math.max(...allCorpRates)
-            const range = maxRate - minRate
-            const barWidth = range > 0
-              ? ((rate.corporateRate - minRate) / range) * 80 + 20
-              : 50
-
-            return (
-              <div key={rate.bank}>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-medium text-gray-900">{rate.bank}</span>
-                  <span className="text-lg font-semibold text-primary">
-                    {rate.corporateRate.toFixed(2)}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-primary rounded-full h-full transition-all duration-300"
-                    style={{ width: `${barWidth}%` }}
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        {allProducts.length === 0 && (
+          <div className="px-6 py-8 text-center text-gray-500">
+            No products available
+          </div>
+        )}
       </div>
 
       {/* Information Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="card p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            How to Use Base Rates
+            How to Use These Rates
           </h3>
           <ul className="space-y-3 text-sm text-gray-600">
             <li className="flex gap-3">
-              <span className="text-primary font-bold">1</span>
+              <span className="text-primary font-bold flex-shrink-0">1</span>
               <span>
-                Use these rates as the starting point for your credit spread
-                analysis
+                Select your desired bank and product from the dropdown menus above to get your base rate
               </span>
             </li>
             <li className="flex gap-3">
-              <span className="text-primary font-bold">2</span>
+              <span className="text-primary font-bold flex-shrink-0">2</span>
               <span>
-                Add your expected spread (from analysis) to get all-in rate
+                Monitor the Official Cash Rate (OCR) as it directly influences bank pricing
               </span>
             </li>
             <li className="flex gap-3">
-              <span className="text-primary font-bold">3</span>
+              <span className="text-primary font-bold flex-shrink-0">3</span>
               <span>
-                Compare with your actual facility rate to identify opportunities
+                Review wholesale rates (BKBM and swaps) to understand interbank funding costs
               </span>
             </li>
             <li className="flex gap-3">
-              <span className="text-primary font-bold">4</span>
+              <span className="text-primary font-bold flex-shrink-0">4</span>
               <span>
-                Update rates periodically as RBNZ OCR changes impact bank pricing
+                Use your selected base rate in the credit analysis tool to calculate expected pricing
               </span>
             </li>
           </ul>
@@ -264,62 +643,59 @@ function BaseRates({ onNavigate }) {
 
         <div className="card p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Rate Spread Insights
+            Rate Components
           </h3>
           <div className="space-y-3">
-            {(() => {
-              const spread = avgWorkingCap - avgCorporate
-              return (
-                <>
-                  <div className="bg-gray-50 p-3 rounded">
-                    <p className="text-xs font-medium text-gray-600 mb-1">
-                      WC Premium
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {(spread * 100).toFixed(0)} bps
-                    </p>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Working capital facilities typically cost {(spread * 100).toFixed(0)} basis
-                    points more than corporate loans due to higher utilization
-                    volatility and administrative costs.
-                  </p>
-                </>
-              )
-            })()}
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="text-xs font-medium text-gray-600 mb-1">Base Rate</p>
+              <p className="text-sm text-gray-900">
+                The starting rate from your selected bank and product
+              </p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="text-xs font-medium text-gray-600 mb-1">Credit Spread</p>
+              <p className="text-sm text-gray-900">
+                Premium added for borrower credit quality (determined by analysis)
+              </p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="text-xs font-medium text-gray-600 mb-1">All-in Rate</p>
+              <p className="text-sm text-gray-900">
+                Base Rate + Credit Spread = Final facility rate
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Footer */}
+      {/* Footer and Navigation */}
       <div className="mt-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="text-sm font-medium text-gray-900 mb-1">
-              Last Updated
-            </p>
-            <p className="text-xs text-gray-600">
-              {lastUpdated.toLocaleDateString()} at{' '}
-              {lastUpdated.toLocaleTimeString()}
-            </p>
-          </div>
-          <p className="text-xs text-gray-500 text-right max-w-xs">
-            Rates shown are illustrative based on current market conditions. Actual rates vary by
-            borrower credit quality, facility structure, and market availability.
-          </p>
-        </div>
+        <p className="text-sm text-gray-600">
+          Rates are sourced directly from bank websites and updated regularly. BKBM and swap rates are
+          wholesale benchmarks used for funding cost calculations. All rates are indicative and subject to
+          borrower credit quality, facility structure, and market conditions.
+        </p>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 flex gap-4">
         <button
           onClick={() => onNavigate('#/analysis')}
           className="btn-primary"
         >
           Use Rates in Analysis
         </button>
+        <button
+          onClick={() => onNavigate('#/dashboard')}
+          className="btn-secondary"
+        >
+          Back to Dashboard
+        </button>
       </div>
     </div>
   )
 }
+
+// Import React for Fragment
+import React from 'react'
 
 export default BaseRates
