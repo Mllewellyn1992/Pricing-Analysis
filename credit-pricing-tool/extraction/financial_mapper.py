@@ -19,36 +19,36 @@ from typing import Dict, Any, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Standard financial fields we try to extract
+# Standard financial fields we try to extract (values in THOUSANDS)
 FINANCIAL_FIELDS = {
-    "revenue_mn": "Total revenue or net sales (millions)",
-    "ebit_mn": "EBIT or operating income (millions)",
-    "depreciation_mn": "Depreciation (millions)",
-    "amortization_mn": "Amortization (millions)",
-    "interest_expense_mn": "Interest expense (millions)",
-    "cash_interest_paid_mn": "Cash interest paid (millions)",
-    "cash_taxes_paid_mn": "Cash taxes paid (millions)",
-    "total_debt_mn": "Total debt (millions)",
-    "st_debt_mn": "Short-term debt (millions)",
-    "cpltd_mn": "Current portion of long-term debt (millions)",
-    "lt_debt_net_mn": "Long-term debt net (millions)",
-    "capital_leases_mn": "Capital leases (millions)",
-    "cash_mn": "Cash and equivalents (millions)",
-    "cash_like_mn": "Cash-like securities (millions)",
-    "total_equity_mn": "Total equity (millions)",
-    "minority_interest_mn": "Minority interest (millions)",
-    "deferred_taxes_mn": "Deferred taxes (millions)",
-    "cfo_mn": "Cash flow from operations (millions)",
-    "capex_mn": "Capital expenditures (millions)",
-    "common_dividends_mn": "Common dividends paid (millions)",
-    "preferred_dividends_mn": "Preferred dividends paid (millions)",
-    "nwc_current_mn": "Net working capital - current period (millions)",
-    "nwc_prior_mn": "Net working capital - prior period (millions)",
-    "lt_operating_assets_current_mn": "Long-term operating assets - current (millions)",
-    "lt_operating_assets_prior_mn": "Long-term operating assets - prior (millions)",
-    "assets_current_mn": "Total assets - current period (millions)",
-    "assets_prior_mn": "Total assets - prior period (millions)",
-    "avg_capital_mn": "Average capital invested (millions)",
+    "revenue_mn": "Total revenue or net sales (thousands)",
+    "ebit_mn": "EBIT or operating income (thousands)",
+    "depreciation_mn": "Depreciation (thousands)",
+    "amortization_mn": "Amortization (thousands)",
+    "interest_expense_mn": "Interest expense (thousands)",
+    "cash_interest_paid_mn": "Cash interest paid (thousands)",
+    "cash_taxes_paid_mn": "Cash taxes paid (thousands)",
+    "total_debt_mn": "Total debt (thousands)",
+    "st_debt_mn": "Short-term debt (thousands)",
+    "cpltd_mn": "Current portion of long-term debt (thousands)",
+    "lt_debt_net_mn": "Long-term debt net (thousands)",
+    "capital_leases_mn": "Capital leases (thousands)",
+    "cash_mn": "Cash and equivalents (thousands)",
+    "cash_like_mn": "Cash-like securities (thousands)",
+    "total_equity_mn": "Total equity (thousands)",
+    "minority_interest_mn": "Minority interest (thousands)",
+    "deferred_taxes_mn": "Deferred taxes (thousands)",
+    "cfo_mn": "Cash flow from operations (thousands)",
+    "capex_mn": "Capital expenditures (thousands)",
+    "common_dividends_mn": "Common dividends paid (thousands)",
+    "preferred_dividends_mn": "Preferred dividends paid (thousands)",
+    "nwc_current_mn": "Net working capital - current period (thousands)",
+    "nwc_prior_mn": "Net working capital - prior period (thousands)",
+    "lt_operating_assets_current_mn": "Long-term operating assets - current (thousands)",
+    "lt_operating_assets_prior_mn": "Long-term operating assets - prior (thousands)",
+    "assets_current_mn": "Total assets - current period (thousands)",
+    "assets_prior_mn": "Total assets - prior period (thousands)",
+    "avg_capital_mn": "Average capital invested (thousands)",
 }
 
 
@@ -127,7 +127,15 @@ DOCUMENT TEXT:
 {table_text}
 
 TASK:
-Extract the following financial fields from the document above. Only extract values that you can identify with reasonable confidence. Report values in MILLIONS of the local currency (note the currency if found).
+Extract the following financial fields from the document above. Only extract values that you can identify with reasonable confidence.
+
+IMPORTANT - UNIT CONVERSION:
+Report ALL values in THOUSANDS (000s) of the local currency.
+- If the document reports in "$000" or "thousands", use the values as-is
+- If the document reports in "$" (whole dollars), divide by 1,000
+- If the document reports in "$M" or "millions", multiply by 1,000
+- If the document reports in "$B" or "billions", multiply by 1,000,000
+- NZ financial statements often report in $000 (thousands) — look for "$000", "'000", or "Expressed in thousands" indicators
 
 FIELDS TO EXTRACT:
 {fields_str}
@@ -136,7 +144,7 @@ RESPONSE FORMAT:
 Return ONLY a valid JSON object with this structure (no other text):
 {{
   "fields": {{
-    "field_name": number_in_millions,
+    "field_name": number_in_thousands,
     "another_field": null
   }},
   "confidence": {{
@@ -145,7 +153,8 @@ Return ONLY a valid JSON object with this structure (no other text):
   }},
   "currency": "USD|NZD|GBP|etc or UNKNOWN",
   "fiscal_period": "FY2024|Q1 2024|etc or UNKNOWN",
-  "notes": "any important notes about the extraction"
+  "source_units": "thousands|millions|dollars|unknown",
+  "notes": "any important notes about the extraction including what unit the document uses"
 }}
 
 CONFIDENCE SCORING:
@@ -158,9 +167,10 @@ CONFIDENCE SCORING:
 CRITICAL RULES:
 1. Only include fields you are confident about (confidence >= 0.40)
 2. Return null for fields you cannot find
-3. All numbers must be in MILLIONS
+3. All numbers must be converted to THOUSANDS
 4. If a field is 0 or missing, return null, not 0
 5. Validate debt components sum reasonably if multiple debt fields found
+6. Pay careful attention to the units used in the document (look for "$000", "in thousands", "$M", etc.)
 """
 
     try:
@@ -193,7 +203,7 @@ CRITICAL RULES:
         fields = {k: v for k, v in fields.items() if v is not None}
         confidence = {k: v for k, v in confidence.items() if confidence.get(k) is not None}
 
-        # Validate numbers are in millions (sanity check for very large outliers)
+        # Validate numbers are in thousands (sanity check for very large outliers)
         errors = []
         for field, value in list(fields.items()):
             if not isinstance(value, (int, float)):
@@ -204,8 +214,8 @@ CRITICAL RULES:
                     del fields[field]
                     if field in confidence:
                         del confidence[field]
-            elif value > 1_000_000:  # Likely not in millions
-                logger.warning(f"{field} value {value} seems too large for millions")
+            elif value > 1_000_000_000:  # > 1 trillion in thousands seems wrong
+                logger.warning(f"{field} value {value} seems too large for thousands")
 
         return {
             "fields": fields,
@@ -296,14 +306,16 @@ def map_financials_heuristic(
                         try:
                             value = float(num_str)
 
-                            # Convert to millions if necessary
+                            # Convert to thousands
                             if "billion" in context or "b)" in context:
-                                value *= 1000
-                            elif "thousand" in context or "k)" in context:
-                                value /= 1000
+                                value *= 1_000_000  # billions to thousands
+                            elif "million" in context or "mn" in context:
+                                value *= 1_000  # millions to thousands
+                            # If already in thousands ($000) or raw dollars,
+                            # leave as-is (most NZ financials report in $000)
 
-                            # Only accept if reasonable range
-                            if 0 < value < 1_000_000:
+                            # Only accept if reasonable range (in thousands)
+                            if 0 < value < 1_000_000_000:
                                 if field not in fields or conf > confidence.get(field, 0):
                                     fields[field] = value
                                     confidence[field] = conf
