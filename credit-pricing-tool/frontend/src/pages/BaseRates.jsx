@@ -56,12 +56,14 @@ function BaseRates({ onNavigate }) {
   ]
 
   const displayRates = rates || defaultRates
-  const avgCorporate =
-    displayRates.reduce((sum, r) => sum + r.corporateRate, 0) /
-    displayRates.length
-  const avgWorkingCap =
-    displayRates.reduce((sum, r) => sum + r.workingCapitalRate, 0) /
-    displayRates.length
+  const ratesWithCorporate = displayRates.filter(r => r.corporateRate != null)
+  const ratesWithWC = displayRates.filter(r => r.workingCapitalRate != null)
+  const avgCorporate = ratesWithCorporate.length > 0
+    ? ratesWithCorporate.reduce((sum, r) => sum + r.corporateRate, 0) / ratesWithCorporate.length
+    : 0
+  const avgWorkingCap = ratesWithWC.length > 0
+    ? ratesWithWC.reduce((sum, r) => sum + r.workingCapitalRate, 0) / ratesWithWC.length
+    : 0
 
   const handleRefresh = () => {
     setLoading(true)
@@ -102,7 +104,7 @@ function BaseRates({ onNavigate }) {
             {avgCorporate.toFixed(2)}%
           </p>
           <div className="flex gap-4 text-xs">
-            {displayRates
+            {ratesWithCorporate
               .slice(0, 3)
               .map((r) => (
                 <span key={r.bank} className="text-gray-500">
@@ -120,7 +122,7 @@ function BaseRates({ onNavigate }) {
             {avgWorkingCap.toFixed(2)}%
           </p>
           <div className="flex gap-4 text-xs">
-            {displayRates
+            {ratesWithWC
               .slice(0, 3)
               .map((r) => (
                 <span key={r.bank} className="text-gray-500">
@@ -153,13 +155,14 @@ function BaseRates({ onNavigate }) {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {displayRates.map((rate) => {
-                const spread =
-                  (rate.workingCapitalRate - rate.corporateRate) * 100
+                const corp = rate.corporateRate ?? 0
+                const wc = rate.workingCapitalRate ?? 0
+                const spread = (wc - corp) * 100
                 return (
                   <tr key={rate.bank} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{rate.logo}</span>
+                        <span className="text-2xl">{rate.logo || '🏦'}</span>
                         <span className="font-medium text-gray-900">
                           {rate.bank}
                         </span>
@@ -167,17 +170,17 @@ function BaseRates({ onNavigate }) {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <p className="text-lg font-semibold text-gray-900">
-                        {rate.corporateRate.toFixed(2)}%
+                        {rate.corporateRate != null ? `${corp.toFixed(2)}%` : '—'}
                       </p>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <p className="text-lg font-semibold text-gray-900">
-                        {rate.workingCapitalRate.toFixed(2)}%
+                        {rate.workingCapitalRate != null ? `${wc.toFixed(2)}%` : '—'}
                       </p>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                        {spread.toFixed(0)} bps
+                        {rate.corporateRate != null && rate.workingCapitalRate != null ? `${spread.toFixed(0)} bps` : '—'}
                       </span>
                     </td>
                   </tr>
@@ -195,12 +198,14 @@ function BaseRates({ onNavigate }) {
         </h2>
 
         <div className="space-y-6">
-          {displayRates.map((rate) => {
-            const barWidth =
-              ((rate.corporateRate - Math.min(...displayRates.map((r) => r.corporateRate))) /
-                (Math.max(...displayRates.map((r) => r.corporateRate)) -
-                  Math.min(...displayRates.map((r) => r.corporateRate)))) *
-              100
+          {displayRates.filter(r => r.corporateRate != null).map((rate) => {
+            const allCorpRates = displayRates.filter(r => r.corporateRate != null).map(r => r.corporateRate)
+            const minRate = Math.min(...allCorpRates)
+            const maxRate = Math.max(...allCorpRates)
+            const range = maxRate - minRate
+            const barWidth = range > 0
+              ? ((rate.corporateRate - minRate) / range) * 80 + 20
+              : 50
 
             return (
               <div key={rate.bank}>
@@ -213,7 +218,7 @@ function BaseRates({ onNavigate }) {
                 <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                   <div
                     className="bg-primary rounded-full h-full transition-all duration-300"
-                    style={{ width: barWidth || 10 + '%' }}
+                    style={{ width: `${barWidth}%` }}
                   />
                 </div>
               </div>

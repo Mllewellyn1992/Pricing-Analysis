@@ -136,11 +136,14 @@ export async function getBaseRates() {
     const data = await response.json()
 
     // Map backend format to frontend format
+    // Some banks may not have corporate_rate (only overdraft/working_capital)
     return data.map(r => ({
       bank: r.bank,
-      corporateRate: r.corporate_rate,
-      workingCapitalRate: r.working_capital_rate,
+      corporateRate: r.corporate_rate ?? r.overdraft_rate ?? null,
+      workingCapitalRate: r.working_capital_rate ?? r.overdraft_rate ?? null,
+      overdraftRate: r.overdraft_rate ?? null,
       lastUpdated: r.last_updated,
+      products: r.products || [],
     }))
   } catch (error) {
     console.error('Error fetching base rates:', error)
