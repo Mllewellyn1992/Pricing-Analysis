@@ -7,7 +7,7 @@ const API_BASE = ''
  * Analyze financial data - calls the real dual-engine rating + pricing pipeline.
  */
 export async function analyzeFinancials(formData) {
-  // Build the financials dict the backend expects (all values in millions)
+  // Build the financials dict the backend expects (all values in thousands)
   const financials = {
     revenue_mn: parseFloat(formData.revenue) || 0,
     ebit_mn: parseFloat(formData.ebit) || 0,

@@ -164,8 +164,10 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
         }
       }
 
-      // Set business description if extracted
-      if (extractedData.businessDescription) {
+      // Set business description from AI classification reasoning (more useful than raw PDF header)
+      if (extractedData.sectorClassification?.reasoning) {
+        newFormData.businessDescription = extractedData.sectorClassification.reasoning
+      } else if (extractedData.businessDescription) {
         newFormData.businessDescription = extractedData.businessDescription
       }
 
@@ -304,10 +306,9 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
               </p>
               {extractionSource.sectorClassification && (
                 <p className="text-xs text-blue-700 mt-1">
-                  AI-classified sector: <span className="font-semibold">{extractionSource.sectorClassification.sp_sector}</span>
-                  {extractionSource.sectorClassification.reasoning && (
-                    <span className="text-gray-500"> — {extractionSource.sectorClassification.reasoning}</span>
-                  )}
+                  AI-classified sector: <span className="font-semibold">
+                    {INDUSTRIES.find(i => i.value === extractionSource.sectorClassification.sp_sector)?.label || extractionSource.sectorClassification.sp_sector}
+                  </span>
                 </p>
               )}
             </div>
@@ -342,12 +343,12 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Business Description
-                {extractedData?.businessDescription && (
-                  <span className="ml-2 text-xs text-blue-600 font-normal">(extracted from PDF)</span>
+                {formData.businessDescription && extractedData?.sectorClassification && (
+                  <span className="ml-2 text-xs text-blue-600 font-normal">(AI-generated from PDF)</span>
                 )}
               </label>
               <p className="text-xs text-gray-500 mb-2">
-                Describes the company's operations — used for AI sector classification
+                Describes the company's operations — used for industry classification
               </p>
               <textarea
                 name="businessDescription"
@@ -356,14 +357,14 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
                 placeholder="e.g., Manufacturing of industrial equipment, focused on dairy and agricultural machinery..."
                 rows="4"
                 className={`input-field w-full ${
-                  extractedData?.businessDescription ? 'border-blue-300 bg-blue-50' : ''
+                  formData.businessDescription && extractedData?.sectorClassification ? 'border-blue-300 bg-blue-50' : ''
                 }`}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                S&P Industry Classification
+                Industry Classification
                 {extractedData?.sectorClassification && (
                   <span className="ml-2 text-xs text-green-600 font-normal">
                     (AI-classified • {Math.round((extractedData.sectorClassification.confidence || 0) * 100)}% confidence)
@@ -389,7 +390,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
         ))}
 
         {/* Income Statement */}
-        {renderSection('Income Statement (NZD millions)', 'income', (
+        {renderSection('Income Statement (NZD thousands)', 'income', (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {renderInput('Revenue', 'revenue', '0')}
             {renderInput('EBIT', 'ebit', '0')}
@@ -402,7 +403,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
         ))}
 
         {/* Balance Sheet */}
-        {renderSection('Balance Sheet (NZD millions)', 'balance', (
+        {renderSection('Balance Sheet (NZD thousands)', 'balance', (
           <div>
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
               <p className="text-sm font-medium text-gray-900 mb-3">
@@ -441,7 +442,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
         ))}
 
         {/* Cash Flow */}
-        {renderSection('Cash Flow (NZD millions)', 'cashflow', (
+        {renderSection('Cash Flow (NZD thousands)', 'cashflow', (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {renderInput('Operating Cash Flow (CFO)', 'cfo', '0')}
             {renderInput('Capital Expenditures', 'capex', '0')}
@@ -509,7 +510,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
 
       <div className="mt-12 max-w-4xl p-6 bg-green-50 border border-green-200 rounded-lg">
         <p className="text-sm text-gray-700">
-          <span className="font-semibold text-green-700">All values in NZD millions.</span> Leave blank or enter 0 for not applicable items.
+          <span className="font-semibold text-green-700">All values in NZD thousands.</span> Leave blank or enter 0 for not applicable items. Click any pre-filled field to override it.
         </p>
       </div>
     </div>

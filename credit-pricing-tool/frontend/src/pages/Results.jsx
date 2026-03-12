@@ -216,12 +216,12 @@ function Results({ data, onNavigate }) {
             {
               label: 'EBITDA',
               value: (data.ebit || 0) + (data.depreciation || 0) + (data.amortization || 0),
-              unit: 'NZD millions',
+              unit: 'NZD thousands',
             },
             {
               label: 'Free Cash Flow',
               value: (data.cfo || 0) - (data.capex || 0),
-              unit: 'NZD millions',
+              unit: 'NZD thousands',
             },
             {
               label: 'Net Debt',
@@ -229,13 +229,13 @@ function Results({ data, onNavigate }) {
                 (data.totalDebt || 0) -
                 (data.cash || 0) -
                 (data.cashLikeAssets || 0),
-              unit: 'NZD millions',
+              unit: 'NZD thousands',
             },
             {
               label: 'Total Capital',
               value:
                 (data.totalDebt || 0) + (data.totalEquity || 0),
-              unit: 'NZD millions',
+              unit: 'NZD thousands',
             },
             {
               label: 'EBIT Margin',

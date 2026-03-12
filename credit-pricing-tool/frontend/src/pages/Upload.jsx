@@ -352,7 +352,7 @@ function Upload({ onNavigate, onUseExtractedData }) {
                 {file.status === 'completed' && file.extractedData && Object.keys(file.extractedData).length > 0 && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                      Extracted Financial Data (NZD millions)
+                      Extracted Financial Data (NZD thousands)
                     </h4>
                     <div className="bg-gray-50 rounded-lg overflow-hidden">
                       <table className="w-full text-sm">

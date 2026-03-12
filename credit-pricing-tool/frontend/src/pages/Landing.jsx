@@ -78,7 +78,7 @@ function Landing({ onNavigate }) {
               <div className="text-4xl mb-4">⚖️</div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">Dual Rating Engines</h3>
               <p className="text-gray-700">
-                Compare credit ratings using both S&P and Moody's methodologies to get a comprehensive view of your credit profile.
+                Compare credit ratings using dual rating methodologies to get a comprehensive view of your credit profile.
               </p>
             </div>
 
@@ -138,7 +138,7 @@ function Landing({ onNavigate }) {
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4 mt-4">Analyze & Rate</h3>
                 <p className="text-gray-700 leading-relaxed">
-                  Our dual rating engines calculate your credit profile using S&P and Moody's methodologies, then look up expected credit spreads from our pricing matrix.
+                  Our dual rating engines calculate your credit profile using industry-standard methodologies, then look up expected credit spreads from our pricing matrix.
                 </p>
               </div>
             </div>
