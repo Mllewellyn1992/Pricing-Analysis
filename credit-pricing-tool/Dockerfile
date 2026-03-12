@@ -1,11 +1,11 @@
 # Build stage for frontend
-FROM node:20-slim as frontend-builder
+FROM node:22-slim as frontend-builder
 
 WORKDIR /app/frontend
 
 # Copy frontend files
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY frontend/ ./
 RUN npm run build
