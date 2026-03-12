@@ -1,24 +1,23 @@
 """
-PDF text and table extraction with multiple fallback strategies.
+PDF text and table extraction using lightweight libraries.
 
 Supports:
 - pdfplumber (primary): Lightweight, reliable PDF library
-- Docling (optional): Advanced document parsing with layout understanding
 - PyPDF2 (fallback): Basic PDF library
-- OCRmyPDF → re-extract (fallback): For scanned documents
 
 Includes v2 table post-processing from 02_docling_to_parquet_v2:
-- Label-merge repair (fixes Docling artifact where values merge into labels)
+- Label-merge repair (fixes artifacts where values merge into labels)
 - Multi-level header detection and merging
 - Quality scoring and flagging per table
+
+NOTE: Docling and OCRmyPDF have been removed to stay within Render free-tier
+512MB RAM limit. These libraries pull in PyTorch (~400MB) which causes OOM.
 """
 
 import os
 import re
-import tempfile
 import logging
-import signal
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +65,9 @@ def _detect_year_columns(columns):
 
 
 def repair_label_merge(columns, rows):
-    """Fix the Docling label-merge artifact: values embedded in the label cell.
+    """Fix the label-merge artifact: values embedded in the label cell.
 
-    When Docling merges a label cell with adjacent value cells, the first cell
+    When extraction merges a label cell with adjacent value cells, the first cell
     looks like "Revenue 1,371,343 1,726,686" while the year columns are empty.
 
     Returns (columns, repaired_rows, repair_count).
@@ -256,7 +255,7 @@ def assess_table_quality(columns, rows):
         flags.append("few_rows")
         score -= 10
 
-    # All-numeric headers (Docling fallback)
+    # All-numeric headers (extraction fallback)
     if all(str(c).strip().isdigit() or not str(c).strip() for c in columns):
         flags.append("all_numeric_headers")
         score -= 25
@@ -312,44 +311,6 @@ def _extract_text_with_pdfplumber(pdf_path: str) -> str:
     return "\n".join(text_parts)
 
 
-def _extract_text_with_docling(pdf_path: str) -> str:
-    """Extract text from PDF using Docling (advanced layout understanding).
-
-    NOTE: Docling loads PyTorch models and requires significant memory.
-    This may fail on free-tier hosting with limited RAM.
-    """
-    from docling.document_converter import DocumentConverter, FormatOption
-    from docling.datamodel.base_models import InputFormat
-    from docling.datamodel.pipeline_options import PdfPipelineOptions
-    from docling.pipeline.standard_pdf_pipeline import StandardPdfPipeline
-    from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
-    from docling_core.types.doc import TextItem
-
-    pdf_options = PdfPipelineOptions(
-        do_ocr=False,
-        force_backend_text=True,
-        do_table_structure=True,
-    )
-    format_options = {
-        InputFormat.PDF: FormatOption(
-            pipeline_cls=StandardPdfPipeline,
-            pipeline_options=pdf_options,
-            backend=PyPdfiumDocumentBackend,
-        )
-    }
-    converter = DocumentConverter(format_options=format_options)
-    result = converter.convert(pdf_path)
-    document = getattr(result, "document", result)
-
-    text_parts = []
-    if hasattr(document, "iterate_items"):
-        for item, _level in document.iterate_items(with_groups=False):
-            if isinstance(item, TextItem):
-                text_parts.append(item.text)
-
-    return "\n".join(text_parts)
-
-
 def _extract_text_with_pypdf2(pdf_path: str) -> str:
     """Extract text from PDF using PyPDF2 (basic fallback)."""
     from PyPDF2 import PdfReader
@@ -365,98 +326,33 @@ def _extract_text_with_pypdf2(pdf_path: str) -> str:
     return "\n".join(text_parts)
 
 
-def _estimate_scanned_pdf(text: str) -> bool:
-    """Heuristic to detect if a PDF appears to be scanned (low text quality)."""
-    if not text or len(text.strip()) < 100:
-        return True
-
-    lines = text.split("\n")
-    odd_lines = sum(1 for line in lines if len(line) < 3 and line.strip())
-    if odd_lines > len(lines) * 0.3:
-        return True
-
-    return False
-
-
-def _apply_ocrmypdf(pdf_path: str) -> str:
-    """Apply OCRmyPDF to a scanned PDF to add text layer."""
-    if not _has_library("ocrmypdf"):
-        logger.warning("ocrmypdf not installed; cannot process scanned PDFs")
-        return pdf_path
-
-    import ocrmypdf
-
-    temp_fd, temp_path = tempfile.mkstemp(suffix=".pdf")
-    os.close(temp_fd)
-
-    try:
-        ocrmypdf.ocr(
-            pdf_path,
-            temp_path,
-            deskew=False,
-            rotate_pages=True,
-            skip_text=True,
-            optimize=1,
-            progress_bar=False,
-            language=["eng"],
-            invalidate_digital_signatures=True,
-        )
-        return temp_path
-    except Exception as e:
-        logger.error(f"OCRmyPDF failed: {e}")
-        try:
-            os.unlink(temp_path)
-        except Exception:
-            pass
-        return pdf_path
-
-
 def extract_text_from_pdf(pdf_path: str) -> str:
     """
-    Extract text from PDF with intelligent fallback strategy.
+    Extract text from PDF with fallback strategy.
 
-    Priority order (changed from v1 to prioritize lightweight libraries):
-    1. pdfplumber (if available) - lightweight, reliable
-    2. Docling (if available) - better for complex layouts but heavy
-    3. PyPDF2 - basic fallback
-    4. If text looks scanned, apply OCRmyPDF and retry
+    Priority:
+    1. pdfplumber - lightweight, reliable
+    2. PyPDF2 - basic fallback
     """
     if not os.path.exists(pdf_path):
         raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
     text = None
-    extraction_method = None
 
     # Try pdfplumber first (lightweight, reliable)
     if _has_library("pdfplumber"):
         try:
             logger.debug(f"Attempting pdfplumber extraction for {pdf_path}")
             text = _extract_text_with_pdfplumber(pdf_path)
-            extraction_method = "pdfplumber"
             logger.info(f"Successfully extracted text using pdfplumber ({len(text)} chars)")
         except Exception as e:
             logger.debug(f"pdfplumber extraction failed: {e}")
 
-    # Try Docling if pdfplumber didn't work or text is very short
-    if (text is None or len(text.strip()) < 200) and _has_library("docling"):
-        try:
-            logger.debug(f"Attempting Docling extraction for {pdf_path}")
-            docling_text = _extract_text_with_docling(pdf_path)
-            if docling_text and (text is None or len(docling_text.strip()) > len(text.strip())):
-                text = docling_text
-                extraction_method = "docling"
-                logger.info(f"Successfully extracted text using Docling ({len(text)} chars)")
-        except MemoryError:
-            logger.warning("Docling failed: out of memory (likely free-tier hosting)")
-        except Exception as e:
-            logger.debug(f"Docling extraction failed: {e}")
-
-    # Try PyPDF2
+    # Try PyPDF2 as fallback
     if text is None and _has_library("PyPDF2"):
         try:
             logger.debug(f"Attempting PyPDF2 extraction for {pdf_path}")
             text = _extract_text_with_pypdf2(pdf_path)
-            extraction_method = "pypdf2"
             logger.info(f"Successfully extracted text using PyPDF2 ({len(text)} chars)")
         except Exception as e:
             logger.debug(f"PyPDF2 extraction failed: {e}")
@@ -465,33 +361,9 @@ def extract_text_from_pdf(pdf_path: str) -> str:
     if text is None:
         raise Exception(
             "All PDF text extraction methods failed. "
-            "Install one of: pdfplumber, docling, or PyPDF2"
+            "Ensure pdfplumber is installed."
         )
 
-    # Check if text looks scanned and apply OCR if needed
-    if _estimate_scanned_pdf(text):
-        logger.info("PDF appears to be scanned; applying OCRmyPDF")
-        ocr_pdf = _apply_ocrmypdf(pdf_path)
-        if ocr_pdf != pdf_path:
-            try:
-                if _has_library("pdfplumber"):
-                    ocr_text = _extract_text_with_pdfplumber(ocr_pdf)
-                elif _has_library("PyPDF2"):
-                    ocr_text = _extract_text_with_pypdf2(ocr_pdf)
-                else:
-                    ocr_text = None
-
-                if ocr_text and len(ocr_text.strip()) > len(text.strip()):
-                    text = ocr_text
-                    extraction_method = f"{extraction_method}_+ocr"
-                    logger.info(f"OCR improved text extraction ({len(text)} chars)")
-            finally:
-                try:
-                    os.unlink(ocr_pdf)
-                except Exception:
-                    pass
-
-    logger.debug(f"Text extraction completed via {extraction_method}")
     return text
 
 
@@ -538,70 +410,9 @@ def _extract_tables_with_pdfplumber(pdf_path: str) -> List[Dict[str, Any]]:
     return tables
 
 
-def _extract_tables_with_docling(pdf_path: str) -> List[Dict[str, Any]]:
-    """Extract tables from PDF using Docling."""
-    from docling.document_converter import DocumentConverter, FormatOption
-    from docling.datamodel.base_models import InputFormat
-    from docling.datamodel.pipeline_options import PdfPipelineOptions
-    from docling.pipeline.standard_pdf_pipeline import StandardPdfPipeline
-    from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
-    import pandas as pd
-
-    pdf_options = PdfPipelineOptions(
-        do_ocr=False,
-        force_backend_text=True,
-        do_table_structure=True,
-    )
-    format_options = {
-        InputFormat.PDF: FormatOption(
-            pipeline_cls=StandardPdfPipeline,
-            pipeline_options=pdf_options,
-            backend=PyPdfiumDocumentBackend,
-        )
-    }
-    converter = DocumentConverter(format_options=format_options)
-    result = converter.convert(pdf_path)
-    document = getattr(result, "document", result)
-
-    tables = []
-    table_list = getattr(document, "tables", None) or []
-
-    for table in table_list:
-        try:
-            df = table.export_to_dataframe()
-            caption = getattr(table, "caption", None) or getattr(table, "label", None) or ""
-
-            columns = [str(c) for c in df.columns]
-            rows = [
-                [str(v) if pd.notna(v) else "" for v in row.values]
-                for _, row in df.iterrows()
-            ]
-
-            # Apply v2 post-processing
-            columns, rows, meta = _postprocess_table(columns, rows)
-
-            tables.append({
-                "columns": columns,
-                "rows": rows,
-                "caption": str(caption).strip() if caption else "",
-                "quality_score": meta["quality_score"],
-                "quality_flags": meta["quality_flags"],
-                "repairs": meta["repairs"],
-            })
-        except Exception as e:
-            logger.warning(f"Failed to export table: {e}")
-            continue
-
-    return tables
-
-
 def extract_tables_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
     """
-    Extract structured tables from PDF with intelligent fallback.
-
-    Priority (changed from v1):
-    1. pdfplumber (if available) - lightweight, reliable
-    2. Docling (if available) - better table structure but heavy
+    Extract structured tables from PDF using pdfplumber.
 
     All tables receive v2 post-processing:
     - Multi-level header merging
@@ -613,25 +424,14 @@ def extract_tables_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
 
     tables = []
 
-    # Try pdfplumber first (lightweight)
+    # Use pdfplumber (lightweight, only option after removing docling)
     if _has_library("pdfplumber"):
         try:
             logger.debug(f"Attempting pdfplumber table extraction for {pdf_path}")
             tables = _extract_tables_with_pdfplumber(pdf_path)
             logger.info(f"Extracted {len(tables)} tables using pdfplumber")
         except Exception as e:
-            logger.debug(f"pdfplumber table extraction failed: {e}")
-
-    # Try Docling if pdfplumber found no tables
-    if not tables and _has_library("docling"):
-        try:
-            logger.debug(f"Attempting Docling table extraction for {pdf_path}")
-            tables = _extract_tables_with_docling(pdf_path)
-            logger.info(f"Extracted {len(tables)} tables using Docling")
-        except MemoryError:
-            logger.warning("Docling table extraction failed: out of memory")
-        except Exception as e:
-            logger.debug(f"Docling table extraction failed: {e}")
+            logger.warning(f"pdfplumber table extraction failed: {e}")
 
     if not tables:
         logger.info("No tables found in PDF")
