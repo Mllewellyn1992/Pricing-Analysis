@@ -3,9 +3,9 @@ FROM node:22-slim as frontend-builder
 
 WORKDIR /app/frontend
 
-# Copy frontend files
-COPY frontend/package*.json ./
-RUN npm install
+# Copy frontend files (only package.json, skip lockfile for npm compat)
+COPY frontend/package.json ./
+RUN npm install --legacy-peer-deps
 
 COPY frontend/ ./
 RUN npm run build
