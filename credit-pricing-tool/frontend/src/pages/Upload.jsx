@@ -146,6 +146,8 @@ function Upload({ onNavigate, onUseExtractedData }) {
                 confidenceScores: result?.confidenceScores || {},
                 extractionMethod: result?.extractionMethod || 'unknown',
                 rawTextPreview: result?.rawTextPreview || '',
+                businessDescription: result?.businessDescription || null,
+                sectorClassification: result?.sectorClassification || null,
               }
             : f
         )
@@ -169,6 +171,8 @@ function Upload({ onNavigate, onUseExtractedData }) {
         confidence: fileData.confidenceScores,
         method: fileData.extractionMethod,
         fileName: fileData.name,
+        businessDescription: fileData.businessDescription,
+        sectorClassification: fileData.sectorClassification,
       })
     }
   }

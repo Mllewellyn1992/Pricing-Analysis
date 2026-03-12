@@ -178,6 +178,8 @@ export async function uploadPDF(file) {
       data: data.extracted_fields || {},
       confidenceScores: data.confidence_scores || {},
       rawTextPreview: data.raw_text_preview || '',
+      businessDescription: data.business_description || null,
+      sectorClassification: data.sector_classification || null,
     }
   } catch (error) {
     console.error('Error uploading PDF:', error)

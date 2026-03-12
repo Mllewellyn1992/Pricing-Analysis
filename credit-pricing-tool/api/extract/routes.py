@@ -1,13 +1,14 @@
 """
 Extract routes
-POST /api/extract/pdf - PDF financial data extraction
+POST /api/extract/pdf - PDF financial data extraction + business description + sector classification
 POST /api/classify-sector - Sector classification
 """
 
 import os
+import re
 import tempfile
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from pydantic import BaseModel
 
@@ -17,6 +18,14 @@ from extraction.sector_classifier import classify_sector_with_ai, classify_secto
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+class SectorClassification(BaseModel):
+    sp_sector: str
+    moodys_sector: str
+    confidence: float
+    reasoning: str
+    method: str
 
 
 class ExtractionResponse(BaseModel):
@@ -30,6 +39,8 @@ class ExtractionResponse(BaseModel):
     currency: str
     fiscal_period: str
     message: str
+    business_description: Optional[str] = None
+    sector_classification: Optional[SectorClassification] = None
 
 
 class SectorClassificationRequest(BaseModel):
@@ -46,6 +57,61 @@ class SectorClassificationResponse(BaseModel):
     method: str
 
 
+def extract_business_description(raw_text: str) -> Optional[str]:
+    """
+    Extract a business description from the first few pages of a financial statement.
+
+    NZ financial statements typically have a section describing the nature
+    of business, principal activities, or company overview near the top.
+    """
+    if not raw_text:
+        return None
+
+    # Take the first ~3000 chars where the business description usually lives
+    text_head = raw_text[:3000].lower()
+
+    # Patterns that often precede business descriptions in NZ financials
+    description_markers = [
+        r"(?:nature\s+of\s+(?:the\s+)?business|principal\s+activit|company\s+overview|"
+        r"about\s+(?:the\s+)?(?:company|group)|business\s+description|"
+        r"(?:the\s+)?(?:company|group)\s+(?:is\s+|operates\s+|provides\s+|engages\s+in))",
+    ]
+
+    # Try to find a description paragraph after one of these markers
+    for pattern in description_markers:
+        match = re.search(pattern, text_head, re.IGNORECASE)
+        if match:
+            start = match.start()
+            # Take up to 500 chars from the match point
+            snippet = raw_text[start:start + 500]
+            # Clean up to first double-newline or 2+ sentences
+            lines = snippet.split('\n')
+            desc_lines = []
+            for line in lines:
+                stripped = line.strip()
+                if not stripped:
+                    if desc_lines:
+                        break
+                    continue
+                desc_lines.append(stripped)
+                # Stop after collecting enough
+                if len(' '.join(desc_lines)) > 200:
+                    break
+            if desc_lines:
+                return ' '.join(desc_lines)[:500]
+
+    # Fallback: just use the first meaningful paragraph from the document
+    paragraphs = raw_text[:2000].split('\n\n')
+    for para in paragraphs:
+        cleaned = para.strip()
+        # Skip short lines (headers, page numbers) and tables
+        if len(cleaned) > 80 and not cleaned.startswith('|') and not re.match(r'^[\d,.\s$%]+$', cleaned):
+            return cleaned[:500]
+
+    # Last resort: first 300 chars
+    return raw_text[:300].strip() if raw_text else None
+
+
 @router.post("/extract/pdf", response_model=ExtractionResponse)
 async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
     """
@@ -53,31 +119,18 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
 
     Process:
     1. Accepts multipart PDF file upload
-    2. Extracts text (Docling → pdfplumber → PyPDF2, with OCR fallback)
+    2. Extracts text using pdfplumber
     3. Extracts tables from document
-    4. Uses Claude API to intelligently identify financial fields (or heuristic fallback)
-    5. Returns structured financial data with confidence scores
-
-    Args:
-        file: Uploaded PDF file
-
-    Returns:
-        Extraction status, extracted fields, confidence scores, and preview text
-
-    Raises:
-        HTTPException: If file is not PDF or extraction fails
+    4. Uses Claude API to identify financial fields (or heuristic fallback)
+    5. Extracts business description from document text
+    6. Classifies sector using AI based on business description
+    7. Returns structured data with confidence scores + sector classification
     """
     if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="File must have a filename"
-        )
+        raise HTTPException(status_code=400, detail="File must have a filename")
 
     if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(
-            status_code=400,
-            detail="File must be a PDF"
-        )
+        raise HTTPException(status_code=400, detail="File must be a PDF")
 
     temp_path = None
     try:
@@ -110,17 +163,12 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
 
         # Map financial fields
         try:
-            # Try AI-powered extraction first
             extraction_result = map_financials_with_ai(raw_text, tables)
-
-            # Fall back to heuristic if AI didn't work well
             if extraction_result.get("method") == "ai" and not extraction_result.get("fields"):
                 logger.info("AI extraction returned no fields, trying heuristic")
                 extraction_result = map_financials_heuristic(raw_text, tables)
-
         except Exception as e:
             logger.warning(f"Financial field extraction failed: {e}")
-            # Fall back to heuristic
             extraction_result = map_financials_heuristic(raw_text, tables)
 
         extracted_fields = extraction_result.get("fields", {})
@@ -134,7 +182,32 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
             f"using {extraction_method} method"
         )
 
-        # Create preview of raw text
+        # Extract business description from PDF text
+        business_description = None
+        try:
+            business_description = extract_business_description(raw_text)
+            if business_description:
+                logger.info(f"Extracted business description ({len(business_description)} chars)")
+        except Exception as e:
+            logger.warning(f"Business description extraction failed: {e}")
+
+        # Classify sector based on business description + raw text context
+        sector_classification = None
+        try:
+            # Use business description if found, otherwise use first 500 chars of raw text
+            classify_text = business_description or raw_text[:500]
+            if classify_text:
+                result = classify_sector_with_ai(classify_text)
+                if result.get("confidence", 0) < 0.4:
+                    result = classify_sector_heuristic(classify_text)
+                sector_classification = SectorClassification(**result)
+                logger.info(
+                    f"Sector classified: S&P={sector_classification.sp_sector}, "
+                    f"confidence={sector_classification.confidence}"
+                )
+        except Exception as e:
+            logger.warning(f"Sector classification failed: {e}")
+
         raw_text_preview = raw_text[:500] if raw_text else ""
 
         return ExtractionResponse(
@@ -147,6 +220,8 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
             currency=currency,
             fiscal_period=fiscal_period,
             message=f"Successfully extracted {len(extracted_fields)} financial fields from {file.filename}",
+            business_description=business_description,
+            sector_classification=sector_classification,
         )
 
     except HTTPException:
@@ -158,7 +233,6 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
             detail=f"Extraction failed: {str(e)}"
         )
     finally:
-        # Clean up temp file
         if temp_path and os.path.exists(temp_path):
             try:
                 os.unlink(temp_path)
@@ -168,49 +242,17 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
 
 @router.post("/classify-sector", response_model=SectorClassificationResponse)
 async def classify_sector(request: SectorClassificationRequest) -> SectorClassificationResponse:
-    """
-    Classify company into S&P and Moody's sectors.
-
-    Uses Claude API for intelligent classification based on business description,
-    with keyword-based heuristic fallback.
-
-    Args:
-        request: Request containing business_description
-
-    Returns:
-        Sector classification with confidence and reasoning
-
-    Raises:
-        HTTPException: If classification fails
-    """
+    """Classify company into S&P and Moody's sectors."""
     if not request.business_description or not request.business_description.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="business_description cannot be empty"
-        )
+        raise HTTPException(status_code=400, detail="business_description cannot be empty")
 
     try:
-        logger.info("Classifying company sector")
-
-        # Try AI-powered classification
         result = classify_sector_with_ai(request.business_description)
-
-        # Fall back to heuristic if confidence is too low
         if result.get("confidence", 0) < 0.4:
-            logger.info("AI confidence too low, trying heuristic")
             result = classify_sector_heuristic(request.business_description)
-
-        logger.info(
-            f"Sector classification: S&P={result['sp_sector']}, "
-            f"Moody's={result['moodys_sector']}, "
-            f"confidence={result['confidence']}"
-        )
 
         return SectorClassificationResponse(**result)
 
     except Exception as e:
         logger.error(f"Sector classification failed: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Classification failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Classification failed: {str(e)}")

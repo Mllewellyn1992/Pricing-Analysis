@@ -33,6 +33,51 @@ const EXTRACTION_TO_FORM = {
   avg_capital_mn: 'avgCapital',
 }
 
+// Industry dropdown: display name → backend sector_id (matches YAML filenames)
+const INDUSTRIES = [
+  { label: 'Select an industry', value: '' },
+  { label: 'Aerospace & Defense', value: 'aerospace_and_defense' },
+  { label: 'Agribusiness & Food', value: 'agribusiness_commodity_foods_and_agricultural_cooperatives' },
+  { label: 'Asset Managers', value: 'asset_managers' },
+  { label: 'Auto Manufacturing', value: 'auto_and_commercial_vehicle_manufacturing' },
+  { label: 'Auto Suppliers', value: 'auto_suppliers' },
+  { label: 'Building Materials', value: 'building_materials' },
+  { label: 'Business & Consumer Services', value: 'business_and_consumer_services' },
+  { label: 'Capital Goods / Manufacturing', value: 'capital_goods' },
+  { label: 'Chemicals (Commodity)', value: 'commodity_chemicals' },
+  { label: 'Chemicals (Specialty)', value: 'specialty_chemicals' },
+  { label: 'Consumer Durables', value: 'consumer_durables' },
+  { label: 'Consumer Staples / Branded Goods', value: 'consumer_staples_and_branded_nondurables' },
+  { label: 'Containers & Packaging', value: 'containers_and_packaging' },
+  { label: 'Contract Drilling', value: 'contract_drilling' },
+  { label: 'Engineering & Construction', value: 'engineering_and_construction' },
+  { label: 'Environmental Services', value: 'environmental_services' },
+  { label: 'Financial Market Infrastructure', value: 'financial_market_infrastructure' },
+  { label: 'Financial Services / Finance Companies', value: 'financial_services_finance_companies' },
+  { label: 'Forest & Paper Products', value: 'forest_and_paper_products' },
+  { label: 'Health Care Equipment', value: 'health_care_equipment' },
+  { label: 'Health Care Services', value: 'health_care_services' },
+  { label: 'Homebuilders & Real Estate Developers', value: 'homebuilders_and_real_estate_developers' },
+  { label: 'Leisure & Sports', value: 'leisure_and_sports' },
+  { label: 'Media & Entertainment', value: 'media_and_entertainment' },
+  { label: 'Metals Production & Processing', value: 'metals_production_and_processing' },
+  { label: 'Midstream Energy', value: 'midstream_energy' },
+  { label: 'Mining', value: 'mining' },
+  { label: 'Oil & Gas E&P', value: 'oil_and_gas_exploration_and_production' },
+  { label: 'Oilfield Services & Equipment', value: 'oilfield_services_and_equipment' },
+  { label: 'Pharmaceuticals', value: 'pharmaceuticals' },
+  { label: 'Railroad, Package Express & Logistics', value: 'railroad_package_express_and_logistics' },
+  { label: 'Refining & Marketing', value: 'refining_and_marketing' },
+  { label: 'Regulated Utilities', value: 'regulated_utilities' },
+  { label: 'Retail & Restaurants', value: 'retail_and_restaurants' },
+  { label: 'Technology Hardware & Semiconductors', value: 'technology_hardware_and_semiconductors' },
+  { label: 'Technology Software & Services', value: 'technology_software_and_services' },
+  { label: 'Telecommunications', value: 'telecommunications' },
+  { label: 'Transportation (Cyclical)', value: 'transportation_cyclical' },
+  { label: 'Transportation Infrastructure', value: 'transportation_infrastructure' },
+  { label: 'Unregulated Power & Gas', value: 'unregulated_power_and_gas' },
+]
+
 const EMPTY_FORM = {
   companyName: '',
   businessDescription: '',
@@ -69,6 +114,8 @@ const EMPTY_FORM = {
   actualRate: '',
   tenor: '3',
   facilityType: 'corporate',
+  selectedBank: '',
+  selectedProduct: '',
 }
 
 function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
@@ -82,8 +129,6 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
   })
 
   const [formData, setFormData] = useState({ ...EMPTY_FORM })
-
-  // Track which fields were auto-filled from extraction
   const [autoFilledFields, setAutoFilledFields] = useState({})
   const [extractionSource, setExtractionSource] = useState(null)
 
@@ -107,7 +152,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
         }
       }
 
-      // Try to set company name from filename
+      // Set company name from filename
       if (extractedData.fileName) {
         const name = extractedData.fileName
           .replace(/\.pdf$/i, '')
@@ -119,12 +164,28 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
         }
       }
 
+      // Set business description if extracted
+      if (extractedData.businessDescription) {
+        newFormData.businessDescription = extractedData.businessDescription
+      }
+
+      // Set sector if AI-classified
+      if (extractedData.sectorClassification) {
+        const sc = extractedData.sectorClassification
+        // Find matching industry value
+        const match = INDUSTRIES.find(i => i.value === sc.sp_sector)
+        if (match) {
+          newFormData.industry = sc.sp_sector
+        }
+      }
+
       setFormData(newFormData)
       setAutoFilledFields(filled)
       setExtractionSource({
         fileName: extractedData.fileName,
         method: extractedData.method,
         fieldCount: Object.keys(filled).length,
+        sectorClassification: extractedData.sectorClassification || null,
       })
 
       // Open all sections that have filled data
@@ -137,36 +198,6 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
       })
     }
   }, [extractedData])
-
-  const industries = [
-    'Select an industry',
-    'Aerospace & Defense',
-    'Automotive',
-    'Banks',
-    'Capital Goods',
-    'Commercial & Professional Services',
-    'Computers & Electronics',
-    'Consumer Discretionary',
-    'Consumer Staples',
-    'Diversified Financials',
-    'Energy',
-    'Food, Beverage & Tobacco',
-    'Health Care Equipment & Services',
-    'Health Care Providers & Services',
-    'Household & Personal Products',
-    'Insurance',
-    'Materials',
-    'Media',
-    'Oil, Gas & Consumable Fuels',
-    'Real Estate',
-    'Retailing',
-    'Semiconductors & Equipment',
-    'Software & Services',
-    'Technology Hardware & Equipment',
-    'Telecommunications Services',
-    'Transportation',
-    'Utilities',
-  ]
 
   const toggleSection = (section) => {
     setExpandedSections((prev) => ({
@@ -181,7 +212,6 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
       ...prev,
       [name]: value,
     }))
-    // If user edits an auto-filled field, mark it as manually modified
     if (autoFilledFields[name]) {
       setAutoFilledFields((prev) => ({
         ...prev,
@@ -238,7 +268,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
           {label}
           {isAutoFilled && (
             <span className="ml-2 text-xs text-blue-600 font-normal">
-              (extracted{confidence ? ` • ${Math.round(confidence * 100)}% confidence` : ''})
+              (extracted{confidence ? ` • ${Math.round(confidence * 100)}%` : ''})
             </span>
           )}
         </label>
@@ -262,22 +292,32 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
 
       {/* Extraction source banner */}
       {extractionSource && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start justify-between">
-          <div>
-            <p className="text-sm font-medium text-blue-900">
-              Pre-filled from: {extractionSource.fileName}
-            </p>
-            <p className="text-xs text-blue-700 mt-1">
-              {extractionSource.fieldCount} fields extracted using {extractionSource.method} method.
-              Fields highlighted in blue were auto-populated. Review and adjust values before analyzing.
-            </p>
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-900">
+                Pre-filled from: {extractionSource.fileName}
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                {extractionSource.fieldCount} fields extracted using {extractionSource.method} method.
+                Fields highlighted in blue were auto-populated.
+              </p>
+              {extractionSource.sectorClassification && (
+                <p className="text-xs text-blue-700 mt-1">
+                  AI-classified sector: <span className="font-semibold">{extractionSource.sectorClassification.sp_sector}</span>
+                  {extractionSource.sectorClassification.reasoning && (
+                    <span className="text-gray-500"> — {extractionSource.sectorClassification.reasoning}</span>
+                  )}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleClearForm}
+              className="text-xs text-blue-600 underline hover:text-blue-800 flex-shrink-0 ml-4"
+            >
+              Clear all
+            </button>
           </div>
-          <button
-            onClick={handleClearForm}
-            className="text-xs text-blue-600 underline hover:text-blue-800 flex-shrink-0 ml-4"
-          >
-            Clear all
-          </button>
         </div>
       )}
 
@@ -302,9 +342,12 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Business Description
+                {extractedData?.businessDescription && (
+                  <span className="ml-2 text-xs text-blue-600 font-normal">(extracted from PDF)</span>
+                )}
               </label>
               <p className="text-xs text-gray-500 mb-2">
-                Describe the company's operations for AI sector mapping
+                Describes the company's operations — used for AI sector classification
               </p>
               <textarea
                 name="businessDescription"
@@ -312,23 +355,32 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
                 onChange={handleChange}
                 placeholder="e.g., Manufacturing of industrial equipment, focused on dairy and agricultural machinery..."
                 rows="4"
-                className="input-field w-full"
+                className={`input-field w-full ${
+                  extractedData?.businessDescription ? 'border-blue-300 bg-blue-50' : ''
+                }`}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 S&P Industry Classification
+                {extractedData?.sectorClassification && (
+                  <span className="ml-2 text-xs text-green-600 font-normal">
+                    (AI-classified • {Math.round((extractedData.sectorClassification.confidence || 0) * 100)}% confidence)
+                  </span>
+                )}
               </label>
               <select
                 name="industry"
                 value={formData.industry}
                 onChange={handleChange}
-                className="input-field w-full"
+                className={`input-field w-full ${
+                  extractedData?.sectorClassification ? 'border-blue-300 bg-blue-50' : ''
+                }`}
               >
-                {industries.map((ind) => (
-                  <option key={ind} value={ind}>
-                    {ind}
+                {INDUSTRIES.map((ind) => (
+                  <option key={ind.value} value={ind.value}>
+                    {ind.label}
                   </option>
                 ))}
               </select>
@@ -358,9 +410,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {renderInput('Total Debt', 'totalDebt', '0')}
-                <div>
-                  <p className="text-xs text-gray-500 mb-3">Or break down as:</p>
-                </div>
+                <div><p className="text-xs text-gray-500 mb-3">Or break down as:</p></div>
                 {renderInput('ST Debt', 'stDebt', '0')}
                 {renderInput('Current Portion LT Debt', 'cpltd', '0')}
                 {renderInput('LT Debt', 'ltDebt', '0')}
@@ -377,9 +427,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
             </div>
 
             <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded">
-              <p className="text-sm font-medium text-gray-900 mb-3">
-                Working Capital & Assets
-              </p>
+              <p className="text-sm font-medium text-gray-900 mb-3">Working Capital & Assets</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {renderInput('NWC (Current)', 'nwcCurrent', '0')}
                 {renderInput('NWC (Prior Year)', 'nwcPrior', '0')}
@@ -425,16 +473,9 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Facility Tenor (Years)
               </label>
-              <select
-                name="tenor"
-                value={formData.tenor}
-                onChange={handleChange}
-                className="input-field w-full"
-              >
+              <select name="tenor" value={formData.tenor} onChange={handleChange} className="input-field w-full">
                 {[1, 2, 3, 4, 5].map((year) => (
-                  <option key={year} value={year}>
-                    {year} year{year > 1 ? 's' : ''}
-                  </option>
+                  <option key={year} value={year}>{year} year{year > 1 ? 's' : ''}</option>
                 ))}
               </select>
             </div>
@@ -443,12 +484,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Facility Type
               </label>
-              <select
-                name="facilityType"
-                value={formData.facilityType}
-                onChange={handleChange}
-                className="input-field w-full"
-              >
+              <select name="facilityType" value={formData.facilityType} onChange={handleChange} className="input-field w-full">
                 <option value="corporate">Corporate Loan</option>
                 <option value="working-capital">Working Capital</option>
               </select>
@@ -456,22 +492,16 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
           </div>
         ))}
 
-        {/* Submit Button */}
+        {/* Submit */}
         <div className="flex gap-4 mt-8">
           <button
             type="submit"
             disabled={loading}
-            className={`btn-primary flex-1 py-3 text-lg font-semibold ${
-              loading ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
+            className={`btn-primary flex-1 py-3 text-lg font-semibold ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {loading ? 'Analyzing...' : 'Calculate Credit Spread'}
           </button>
-          <button
-            type="button"
-            className="btn-secondary px-8 py-3"
-            onClick={handleClearForm}
-          >
+          <button type="button" className="btn-secondary px-8 py-3" onClick={handleClearForm}>
             Clear Form
           </button>
         </div>
@@ -479,7 +509,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
 
       <div className="mt-12 max-w-4xl p-6 bg-green-50 border border-green-200 rounded-lg">
         <p className="text-sm text-gray-700">
-          <span className="font-semibold text-green-700">All values in NZD millions.</span> Leave blank or enter 0 for not applicable items. The analysis will compute key financial ratios and benchmark your facility pricing against market rates.
+          <span className="font-semibold text-green-700">All values in NZD millions.</span> Leave blank or enter 0 for not applicable items.
         </p>
       </div>
     </div>
