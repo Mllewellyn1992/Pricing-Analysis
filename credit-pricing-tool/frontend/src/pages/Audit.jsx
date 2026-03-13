@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import React from 'react'
-import { getAuditLog, triggerScrape, getBankHistory } from '../api'
+import { getAuditLog, triggerScrape, getBankHistory, getWholesaleRates, injectWholesaleRates } from '../api'
 
 /**
  * Simple SVG line chart for rate history
@@ -81,10 +81,25 @@ function Audit({ onNavigate }) {
   const [expandedBank, setExpandedBank] = useState(null)
   const [historyLoading, setHistoryLoading] = useState({})
   const [error, setError] = useState(null)
+  const [wholesaleData, setWholesaleData] = useState(null)
+  const [wholesaleLoading, setWholesaleLoading] = useState(false)
 
   useEffect(() => {
     loadAuditData()
+    loadWholesaleData()
   }, [])
+
+  const loadWholesaleData = async () => {
+    try {
+      setWholesaleLoading(true)
+      const data = await getWholesaleRates()
+      setWholesaleData(data)
+    } catch (err) {
+      console.error('Error loading wholesale data:', err)
+    } finally {
+      setWholesaleLoading(false)
+    }
+  }
 
   const loadAuditData = async () => {
     try {
@@ -252,6 +267,143 @@ function Audit({ onNavigate }) {
                 : 'Rate history will not persist across container restarts. Run the SQL migration to enable Supabase.'}
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Wholesale Rates (Swap & BKBM) Section */}
+      <div className="card overflow-hidden mb-8">
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Wholesale Rates (Swap & BKBM)</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Current NZ interest rate swap curves — sourced from{' '}
+                <a
+                  href="https://www.interest.co.nz/charts/interest-rates/swap-rates"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  interest.co.nz/charts/interest-rates/swap-rates
+                </a>
+              </p>
+            </div>
+            <button
+              onClick={loadWholesaleData}
+              disabled={wholesaleLoading}
+              className="btn-secondary text-sm flex items-center gap-1"
+            >
+              {wholesaleLoading ? (
+                <>
+                  <span className="inline-block animate-spin h-3 w-3 border-2 border-primary border-t-transparent rounded-full" />
+                  Loading...
+                </>
+              ) : (
+                'Refresh'
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {wholesaleData?.latest?.swap?.length > 0 || wholesaleData?.latest?.bkbm?.length > 0 ? (
+            <div className="space-y-6">
+              {/* Current Swap Rates Table */}
+              {wholesaleData.latest.swap?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Current Swap Rates</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                    {wholesaleData.latest.swap.map(rate => (
+                      <div key={rate.tenor || rate.rate_name} className="bg-blue-50 rounded-lg p-3 text-center">
+                        <p className="text-xs text-blue-600 font-medium">{rate.tenor || rate.rate_name}</p>
+                        <p className="text-xl font-bold text-blue-900">{rate.rate_pct?.toFixed(2)}%</p>
+                        {rate.source && (
+                          <p className="text-xs text-blue-400 mt-1 truncate" title={rate.source}>
+                            {rate.source}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Current BKBM Rates Table */}
+              {wholesaleData.latest.bkbm?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Current BKBM Rates</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                    {wholesaleData.latest.bkbm.map(rate => (
+                      <div key={rate.tenor || rate.rate_name} className="bg-green-50 rounded-lg p-3 text-center">
+                        <p className="text-xs text-green-600 font-medium">{rate.tenor || rate.rate_name}</p>
+                        <p className="text-xl font-bold text-green-900">{rate.rate_pct?.toFixed(2)}%</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Scraped timestamp */}
+              <p className="text-xs text-gray-400 text-right">
+                Last scraped: {wholesaleData.scraped_at
+                  ? new Date(wholesaleData.scraped_at).toLocaleString('en-NZ')
+                  : 'Unknown'}
+              </p>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-gray-500 text-sm mb-2">
+                No wholesale rate data available yet.
+              </p>
+              <p className="text-gray-400 text-xs">
+                Swap rates are scraped from{' '}
+                <a
+                  href="https://www.interest.co.nz/charts/interest-rates/swap-rates"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  interest.co.nz
+                </a>{' '}
+                via browser automation. Run a full scrape or use the data injection API.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Source Verification Links */}
+      <div className="card p-6 mb-8">
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Verify Rate Sources</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Click any link below to manually verify the extracted rates against the source website.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {[
+            { name: 'Swap Rates Chart', url: 'https://www.interest.co.nz/charts/interest-rates/swap-rates', desc: 'Daily NZ swap rate curves' },
+            { name: 'ANZ Business Rates', url: 'https://www.anz.co.nz/business/borrowing-options/', desc: 'ANZ corporate lending rates' },
+            { name: 'ASB Business Rates', url: 'https://www.asb.co.nz/business-loans-and-finance/interest-rates', desc: 'ASB business loan rates' },
+            { name: 'BNZ Business Rates', url: 'https://www.bnz.co.nz/business-banking/borrow', desc: 'BNZ business borrowing rates' },
+            { name: 'Kiwibank Business', url: 'https://www.kiwibank.co.nz/business-banking/loans-and-credit/', desc: 'Kiwibank business lending' },
+            { name: 'Westpac Business', url: 'https://www.westpac.co.nz/business/borrowing/', desc: 'Westpac business borrowing' },
+            { name: 'RBNZ OCR', url: 'https://www.rbnz.govt.nz/monetary-policy/official-cash-rate-decisions', desc: 'Official Cash Rate decisions' },
+            { name: 'interest.co.nz Base Rates', url: 'https://www.interest.co.nz/borrowing/business-base-rates', desc: 'All bank base rates comparison' },
+            { name: 'NZFMA', url: 'https://www.nzfma.org/', desc: 'NZ Financial Markets Association' },
+          ].map(link => (
+            <a
+              key={link.name}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-blue-50 transition-colors"
+            >
+              <span className="text-primary mt-0.5">🔗</span>
+              <div>
+                <p className="text-sm font-medium text-gray-900">{link.name}</p>
+                <p className="text-xs text-gray-500">{link.desc}</p>
+              </div>
+            </a>
+          ))}
         </div>
       </div>
 

@@ -367,3 +367,27 @@ export async function getAuditDetail(auditId) {
     throw error
   }
 }
+
+/**
+ * Inject browser-scraped wholesale rates into Supabase.
+ * Used by the browser scraper to save swap/BKBM data extracted from charts.
+ * @param {Array} rates - Array of rate objects with rate_name, rate_pct, tenor, rate_type, date, source
+ * @param {string} source - Source description
+ */
+export async function injectWholesaleRates(rates, source = 'interest.co.nz (browser)') {
+  try {
+    const response = await fetch(`${API_BASE}/api/rates/wholesale/inject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rates, source }),
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.detail || `API error: ${response.statusText}`)
+    }
+    return await response.json()
+  } catch (error) {
+    console.error('Error injecting wholesale rates:', error)
+    throw error
+  }
+}

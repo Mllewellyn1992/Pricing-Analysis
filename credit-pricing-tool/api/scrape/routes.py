@@ -24,7 +24,7 @@ Scrape trigger & audit endpoints:
 
 import logging
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -316,6 +316,60 @@ def get_wholesale_rates(
             status_code=500,
             detail=f"Failed to retrieve wholesale rates: {str(e)}"
         )
+
+
+# ─── Browser-Scraped Wholesale Rate Injection ────────────────────────────────
+
+
+@router.post("/rates/wholesale/inject")
+def inject_wholesale_rates(payload: Dict[str, Any] = Body(...)):
+    """
+    Receive wholesale rates scraped via browser automation (Claude in Chrome).
+
+    Accepts a list of rate objects and saves them to Supabase.
+    This endpoint is called by the frontend after browser-scraping
+    the interest.co.nz swap rates page.
+
+    Body: { "rates": [...], "source": "interest.co.nz (browser)" }
+    """
+    from .rate_store import _get_supabase
+
+    rate_list = payload.get("rates", [])
+    source = payload.get("source", "browser")
+
+    if not rate_list:
+        raise HTTPException(status_code=400, detail="No rates provided")
+
+    client = _get_supabase()
+    if not client:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    now = datetime.utcnow().isoformat() + "Z"
+    saved = 0
+    errors = []
+
+    for r in rate_list:
+        try:
+            client.table("wholesale_rate_snapshots").insert({
+                "scraped_at": now,
+                "rate_name": r.get("rate_name", ""),
+                "rate_pct": r.get("rate_pct", 0),
+                "tenor": r.get("tenor", ""),
+                "rate_type": r.get("rate_type", "swap"),
+                "rate_date": r.get("date", now[:10]),
+                "source": r.get("source", source),
+            }).execute()
+            saved += 1
+        except Exception as e:
+            errors.append(f"{r.get('rate_name', '?')}: {e}")
+
+    return {
+        "success": saved > 0,
+        "saved": saved,
+        "total": len(rate_list),
+        "errors": errors,
+        "scraped_at": now,
+    }
 
 
 # ─── Scrape Trigger ──────────────────────────────────────────────────────────

@@ -569,11 +569,24 @@ def scrape_bkbm_swap_history(days: int = 90) -> Dict[str, List[Dict[str, Any]]]:
     return history
 
 
+# ─── Bank Filter ──────────────────────────────────────────────────────────────
+# Only keep the major NZ banks — filter out non-bank lenders like
+# Cash Flow Funding, Fuelled, Taxi, Zip Business, Heartland, etc.
+
+NZ_MAJOR_BANKS = {"ANZ", "ASB", "BNZ", "Kiwibank", "Westpac"}
+
+
+def _filter_major_banks(products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Keep only products from the 5 major NZ banks."""
+    return [p for p in products if p.get("bank") in NZ_MAJOR_BANKS]
+
+
 # ─── Master Scraper ────────────────────────────────────────────────────────────
 
 def scrape_all_bank_products() -> Dict[str, Any]:
     """
     Run all scrapers and return a consolidated result.
+    Only includes the 5 major NZ banks: ANZ, ASB, BNZ, Kiwibank, Westpac.
 
     Returns:
         {
@@ -615,6 +628,10 @@ def scrape_all_bank_products() -> Dict[str, Any]:
             banks_scraped.add(p["bank"])
     except Exception as e:
         errors.append(f"interest.co.nz: {e}")
+
+    # Filter to major NZ banks only
+    all_products = _filter_major_banks(all_products)
+    banks_scraped = banks_scraped & NZ_MAJOR_BANKS
 
     # 4. OCR
     ocr = None
