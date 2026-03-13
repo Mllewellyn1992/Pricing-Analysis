@@ -431,21 +431,36 @@ def get_wholesale_history(rate_type: str = "", days: int = 0) -> List[Dict[str, 
 
     if client:
         try:
-            query = (
-                client.table("wholesale_rate_snapshots")
-                .select("*")
-                .order("scraped_at", desc=False)
-                .limit(10000)
-            )
+            # Supabase PostgREST caps at 1000 rows per request regardless
+            # of .limit(). We must paginate to get all records.
+            all_data = []
+            page_size = 1000
+            offset = 0
 
-            if rate_type:
-                query = query.eq("rate_type", rate_type)
+            while True:
+                query = (
+                    client.table("wholesale_rate_snapshots")
+                    .select("*")
+                    .order("scraped_at", desc=False)
+                    .range(offset, offset + page_size - 1)
+                )
 
-            if days > 0:
-                cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat() + "Z"
-                query = query.gte("scraped_at", cutoff)
+                if rate_type:
+                    query = query.eq("rate_type", rate_type)
 
-            resp = query.execute()
+                if days > 0:
+                    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat() + "Z"
+                    query = query.gte("scraped_at", cutoff)
+
+                resp = query.execute()
+                batch = resp.data or []
+                all_data.extend(batch)
+
+                if len(batch) < page_size:
+                    break  # No more pages
+                offset += page_size
+
+            logger.info(f"Fetched {len(all_data)} wholesale_rate_snapshots (rate_type={rate_type}, days={days})")
 
             return [
                 {
@@ -456,7 +471,7 @@ def get_wholesale_history(rate_type: str = "", days: int = 0) -> List[Dict[str, 
                     "date": r.get("rate_date", r["scraped_at"]),
                     "scraped_at": r["scraped_at"],
                 }
-                for r in (resp.data or [])
+                for r in all_data
             ]
         except Exception as e:
             logger.error(f"Failed to get wholesale history from Supabase: {e}")
