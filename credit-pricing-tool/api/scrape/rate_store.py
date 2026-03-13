@@ -435,6 +435,7 @@ def get_wholesale_history(rate_type: str = "", days: int = 0) -> List[Dict[str, 
                 client.table("wholesale_rate_snapshots")
                 .select("*")
                 .order("scraped_at", desc=False)
+                .limit(10000)
             )
 
             if rate_type:

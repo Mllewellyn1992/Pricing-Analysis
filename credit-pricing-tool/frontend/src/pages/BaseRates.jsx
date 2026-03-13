@@ -489,10 +489,11 @@ function BaseRates({ onNavigate }) {
               <SimpleLineChart
                 data={wholesaleData.history.bkbm}
                 lines={[
+                  { key: 'OCR', label: 'OCR', color: '#ef4444' },
                   { key: '1M', label: 'BKBM 1 Month', color: '#3b82f6' },
                   { key: '2M', label: 'BKBM 2 Month', color: '#8b5cf6' },
                   { key: '3M', label: 'BKBM 3 Month', color: '#06b6d4' },
-                  { key: '6M', label: 'BKBM 6 Month', color: '#f59e0b' },
+                  { key: 'BB90D', label: 'BB90D', color: '#f59e0b' },
                 ]}
                 width={700}
                 height={300}
