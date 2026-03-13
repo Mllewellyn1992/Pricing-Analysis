@@ -4,7 +4,6 @@ import Dashboard from './pages/Dashboard'
 import AnalysisForm from './pages/AnalysisForm'
 import Results from './pages/Results'
 import BaseRates from './pages/BaseRates'
-import Upload from './pages/Upload'
 import Audit from './pages/Audit'
 
 function App() {
@@ -31,6 +30,7 @@ function App() {
     navigate('#/results')
   }
 
+  // Legacy support: if Upload page sends data, redirect to analysis
   const handleExtractedData = (data) => {
     setExtractedData(data)
     navigate('#/analysis')
@@ -47,6 +47,7 @@ function App() {
       case 'dashboard':
         return <Dashboard onNavigate={navigate} />
       case 'analysis':
+      case 'upload':  // Redirect old upload route to analysis
         return (
           <AnalysisForm
             onResults={handleAnalysisSubmit}
@@ -58,8 +59,6 @@ function App() {
         return <Results data={analysisResults} onNavigate={navigate} />
       case 'rates':
         return <BaseRates onNavigate={navigate} />
-      case 'upload':
-        return <Upload onNavigate={navigate} onUseExtractedData={handleExtractedData} />
       case 'audit':
         return <Audit onNavigate={navigate} />
       default:
@@ -83,7 +82,6 @@ function App() {
             {[
               { href: '#/dashboard', label: 'Dashboard', icon: '📊' },
               { href: '#/analysis', label: 'Analysis', icon: '📋' },
-              { href: '#/upload', label: 'Upload PDF', icon: '📄' },
               { href: '#/rates', label: 'Base Rates', icon: '💹' },
               { href: '#/audit', label: 'Rate Audit', icon: '🔍' },
             ].map((item) => (

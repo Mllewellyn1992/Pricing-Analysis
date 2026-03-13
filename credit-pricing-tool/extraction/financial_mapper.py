@@ -51,6 +51,128 @@ FINANCIAL_FIELDS = {
     "avg_capital_mn": "Average capital invested (thousands)",
 }
 
+# Section headers that indicate financial statements (in priority order)
+_SECTION_MARKERS = [
+    # Primary financial statements
+    "statement of comprehensive income",
+    "income statement",
+    "profit or loss",
+    "profit and loss",
+    "statement of financial position",
+    "balance sheet",
+    "statement of cash flows",
+    "cash flow statement",
+    "statement of changes in equity",
+    # Key line items (fallback if no headers found)
+    "revenue",
+    "total assets",
+    "total equity",
+    "cash flows from operating",
+    "profit before tax",
+]
+
+
+def _extract_relevant_sections(raw_text: str, max_chars: int = 20000) -> str:
+    """Extract the most financially-relevant sections from raw PDF text.
+
+    Instead of blindly taking the first N characters (which may be cover pages,
+    auditor reports, etc.), this finds and prioritises financial statement sections.
+
+    Strategy:
+    1. Search for financial statement headers and extract surrounding content
+    2. Skip TOC/index entries (short lines that just list section names)
+    3. Prioritise sections with actual numeric data
+    4. Deduplicate overlapping sections
+    5. If nothing found, fall back to first max_chars characters
+    """
+    if len(raw_text) <= max_chars:
+        return raw_text
+
+    text_lower = raw_text.lower()
+
+    # Find positions of financial statement sections
+    sections = []
+    for marker in _SECTION_MARKERS:
+        start = 0
+        while True:
+            idx = text_lower.find(marker, start)
+            if idx == -1:
+                break
+
+            # Skip TOC entries: if the surrounding context (300 chars) has very
+            # few numbers, it's likely just a table of contents line
+            context = raw_text[idx:min(len(raw_text), idx + 400)]
+            number_count = len(re.findall(r"\d{3,}", context))
+
+            if number_count >= 3:
+                # This section has actual financial data
+                section_start = max(0, idx - 100)
+                section_end = min(len(raw_text), idx + 3000)
+                sections.append((section_start, section_end, marker, True))
+            elif number_count >= 1:
+                # Might have some data, lower priority
+                section_start = max(0, idx - 50)
+                section_end = min(len(raw_text), idx + 1500)
+                sections.append((section_start, section_end, marker, False))
+            # Skip entries with no numbers at all (TOC lines)
+
+            start = idx + len(marker)
+
+    if not sections:
+        # No financial sections found — fall back to first max_chars
+        return raw_text[:max_chars]
+
+    # Prioritise: sections with actual data first, then secondary sections
+    primary = [(s, e, m) for s, e, m, has_data in sections if has_data]
+    secondary = [(s, e, m) for s, e, m, has_data in sections if not has_data]
+
+    # Sort each group by position and merge overlapping sections
+    def merge_sections(secs):
+        secs.sort(key=lambda x: x[0])
+        merged = []
+        for start, end, marker in secs:
+            if merged and start <= merged[-1][1] + 200:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end), merged[-1][2])
+            else:
+                merged.append((start, end, marker))
+        return merged
+
+    primary_merged = merge_sections(primary)
+    secondary_merged = merge_sections(secondary)
+
+    # Build the relevant text: primary sections first, then secondary if budget allows
+    parts = []
+    total_chars = 0
+
+    for start, end, marker in primary_merged:
+        chunk = raw_text[start:end]
+        if total_chars + len(chunk) > max_chars:
+            remaining = max_chars - total_chars
+            if remaining > 500:
+                parts.append(chunk[:remaining])
+                total_chars += remaining
+            break
+        parts.append(chunk)
+        total_chars += len(chunk)
+
+    # Add secondary sections if we have budget remaining
+    for start, end, marker in secondary_merged:
+        chunk = raw_text[start:end]
+        if total_chars + len(chunk) > max_chars:
+            remaining = max_chars - total_chars
+            if remaining > 500:
+                parts.append(chunk[:remaining])
+            break
+        parts.append(chunk)
+        total_chars += len(chunk)
+
+    result = "\n...\n".join(parts)
+    logger.info(
+        f"Extracted {len(result)} relevant chars from {len(raw_text)} total "
+        f"({len(primary_merged)} primary + {len(secondary_merged)} secondary sections)"
+    )
+    return result
+
 
 def map_financials_with_ai(
     raw_text: str,
@@ -115,15 +237,19 @@ def map_financials_with_ai(
             for row in rows:
                 table_text += " | ".join(row) + "\n"
 
-    # Build the extraction prompt
+    # Build the extraction prompt — send the most relevant sections, not just the first 8K
     fields_str = "\n".join(
         f"- {field}: {desc}" for field, desc in FINANCIAL_FIELDS.items()
     )
 
+    # Extract financial statement sections from the full text
+    # 20K chars ≈ 5K tokens — well within Claude's context window
+    relevant_text = _extract_relevant_sections(raw_text, max_chars=20000)
+
     prompt = f"""You are a financial data extraction expert. Extract financial data from the following financial statement.
 
 DOCUMENT TEXT:
-{raw_text[:8000]}
+{relevant_text}
 {table_text}
 
 TASK:
@@ -131,11 +257,24 @@ Extract the following financial fields from the document above. Only extract val
 
 IMPORTANT - UNIT CONVERSION:
 Report ALL values in THOUSANDS (000s) of the local currency.
-- If the document reports in "$000" or "thousands", use the values as-is
-- If the document reports in "$" (whole dollars), divide by 1,000
-- If the document reports in "$M" or "millions", multiply by 1,000
-- If the document reports in "$B" or "billions", multiply by 1,000,000
-- NZ financial statements often report in $000 (thousands) — look for "$000", "'000", or "Expressed in thousands" indicators
+
+STEP 1: Determine the document's reporting unit FIRST by looking for explicit indicators:
+- "$000", "'000", "Expressed in thousands", "in thousands of NZ dollars" → THOUSANDS (use values as-is)
+- "$M", "in millions", "NZ$m" → MILLIONS (multiply by 1,000 to get thousands)
+- "$B", "in billions" → BILLIONS (multiply by 1,000,000 to get thousands)
+- "$", "NZ$" with NO scale indicator → WHOLE DOLLARS (divide by 1,000 to get thousands)
+
+STEP 2: Verify by checking if the resulting thousands values make sense:
+- A small NZ company typically has revenue of 500-50,000 (i.e. $500K-$50M)
+- A large NZ company typically has revenue of 50,000-10,000,000 (i.e. $50M-$10B)
+- If revenue comes out as 0.5-50 in thousands (i.e. $500-$50,000), you likely divided by too much
+- If revenue comes out as 500,000,000+ in thousands (i.e. $500B+), you likely multiplied too much
+
+STEP 3: Common NZ annual report patterns:
+- Many NZ companies report in WHOLE DOLLARS with values like "1,562,674" or "37,678,302"
+- If you see numbers with 6+ digits and commas (e.g., "1,234,567") and NO "$000" indicator, these are WHOLE DOLLARS → divide by 1,000
+- If you see numbers with 3-4 digits (e.g., "1,234") and a "$000" indicator, they are already in thousands
+- Property companies may show values in tens of millions in whole dollars — still divide by 1,000
 
 FIELDS TO EXTRACT:
 {fields_str}

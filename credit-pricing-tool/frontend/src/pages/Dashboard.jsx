@@ -53,28 +53,28 @@ function Dashboard({ onNavigate }) {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
         <div className="card p-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Manual Analysis</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Start Analysis</h2>
           <p className="text-gray-600 mb-6">
-            Input your company's financial data directly to calculate expected credit spreads and all-in rates.
+            Upload a PDF or enter financials manually to calculate expected credit spreads and all-in rates.
           </p>
           <button
             onClick={() => onNavigate('#/analysis')}
             className="btn-primary w-full"
           >
-            Start Analysis
+            New Analysis
           </button>
         </div>
 
         <div className="card p-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Upload Financial Statements</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">NZ Base Rates</h2>
           <p className="text-gray-600 mb-6">
-            Extract financial data from PDF statements using AI-powered extraction to populate analysis automatically.
+            View current corporate and working capital lending rates from major NZ banks.
           </p>
           <button
-            onClick={() => onNavigate('#/upload')}
+            onClick={() => onNavigate('#/rates')}
             className="btn-primary w-full"
           >
-            Upload PDF
+            View Rates
           </button>
         </div>
       </div>
