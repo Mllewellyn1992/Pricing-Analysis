@@ -321,16 +321,22 @@ def get_wholesale_rates(
                     })
 
         if not latest_bkbm and bkbm_chart:
-            last_entry = bkbm_chart[-1]
-            for tenor, rate in last_entry.items():
-                if tenor != "date" and isinstance(rate, (int, float)):
-                    latest_bkbm.append({
-                        "rate_name": f"{tenor}",
-                        "rate_pct": rate,
-                        "tenor": tenor,
-                        "rate_type": "bkbm",
-                        "source": "Supabase (browser-scraped from interest.co.nz)",
-                    })
+            # Pull the most recent value for EACH tenor (not just from one date)
+            seen_tenors = {}
+            for entry in reversed(bkbm_chart):
+                for tenor, rate in entry.items():
+                    if tenor != "date" and isinstance(rate, (int, float)) and tenor not in seen_tenors:
+                        seen_tenors[tenor] = rate
+                if len(seen_tenors) >= 10:  # sanity limit
+                    break
+            for tenor, rate in seen_tenors.items():
+                latest_bkbm.append({
+                    "rate_name": f"{tenor}",
+                    "rate_pct": rate,
+                    "tenor": tenor,
+                    "rate_type": "bkbm",
+                    "source": "Supabase (browser-scraped from interest.co.nz)",
+                })
 
         return {
             "latest_rates": latest_swap + latest_bkbm,
