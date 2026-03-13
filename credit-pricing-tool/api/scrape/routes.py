@@ -295,8 +295,33 @@ def get_wholesale_rates(
         latest_bkbm = [r for r in latest_rates if r.get("rate_type") == "bkbm"]
         latest_swap = [r for r in latest_rates if r.get("rate_type") == "swap"]
 
+        # Fallback: if live scrape returned nothing, pull latest from DB history
+        if not latest_swap and swap_chart:
+            last_entry = swap_chart[-1]  # Most recent date
+            for tenor, rate in last_entry.items():
+                if tenor != "date" and isinstance(rate, (int, float)):
+                    latest_swap.append({
+                        "rate_name": f"Swap {tenor}",
+                        "rate_pct": rate,
+                        "tenor": tenor,
+                        "rate_type": "swap",
+                        "source": "Supabase (latest stored)",
+                    })
+
+        if not latest_bkbm and bkbm_chart:
+            last_entry = bkbm_chart[-1]
+            for tenor, rate in last_entry.items():
+                if tenor != "date" and isinstance(rate, (int, float)):
+                    latest_bkbm.append({
+                        "rate_name": f"BKBM {tenor}",
+                        "rate_pct": rate,
+                        "tenor": tenor,
+                        "rate_type": "bkbm",
+                        "source": "Supabase (latest stored)",
+                    })
+
         return {
-            "latest_rates": latest_rates,
+            "latest_rates": latest_swap + latest_bkbm,
             "latest": {
                 "bkbm": latest_bkbm,
                 "swap": latest_swap,
