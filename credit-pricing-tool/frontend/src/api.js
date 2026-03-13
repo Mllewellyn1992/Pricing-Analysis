@@ -286,3 +286,84 @@ export async function getWholesaleRates() {
     throw error
   }
 }
+
+/**
+ * Get rate history for a specific bank product.
+ * @param {string} bank - Bank name
+ * @param {string} product - Product name
+ * @param {number} days - Number of days (0 = all history)
+ */
+export async function getProductHistory(bank, product, days = 0) {
+  try {
+    const params = new URLSearchParams({ bank, product, days: days.toString() })
+    const response = await fetch(`${API_BASE}/api/rates/history?${params}`)
+    if (!response.ok) throw new Error(`API error: ${response.statusText}`)
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching product history:', error)
+    throw error
+  }
+}
+
+/**
+ * Get rate history for ALL products of a bank.
+ * @param {string} bank - Bank name
+ * @param {number} days - Number of days (0 = all history)
+ */
+export async function getBankHistory(bank, days = 0) {
+  try {
+    const params = new URLSearchParams({ bank, days: days.toString() })
+    const response = await fetch(`${API_BASE}/api/rates/bank-history?${params}`)
+    if (!response.ok) throw new Error(`API error: ${response.statusText}`)
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching bank history:', error)
+    throw error
+  }
+}
+
+/**
+ * Trigger a full scrape of all rate sources and save to database.
+ */
+export async function triggerScrape() {
+  try {
+    const response = await fetch(`${API_BASE}/api/rates/scrape`, {
+      method: 'POST',
+    })
+    if (!response.ok) throw new Error(`API error: ${response.statusText}`)
+    return await response.json()
+  } catch (error) {
+    console.error('Error triggering scrape:', error)
+    throw error
+  }
+}
+
+/**
+ * Get the scrape audit log and data summary.
+ * @param {number} limit - Number of entries to return
+ */
+export async function getAuditLog(limit = 50) {
+  try {
+    const response = await fetch(`${API_BASE}/api/rates/audit?limit=${limit}`)
+    if (!response.ok) throw new Error(`API error: ${response.statusText}`)
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching audit log:', error)
+    throw error
+  }
+}
+
+/**
+ * Get detailed audit information for a specific scrape run.
+ * @param {number} auditId - Audit entry ID
+ */
+export async function getAuditDetail(auditId) {
+  try {
+    const response = await fetch(`${API_BASE}/api/rates/audit/${auditId}`)
+    if (!response.ok) throw new Error(`API error: ${response.statusText}`)
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching audit detail:', error)
+    throw error
+  }
+}

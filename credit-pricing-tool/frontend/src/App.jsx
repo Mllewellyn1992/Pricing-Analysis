@@ -5,6 +5,7 @@ import AnalysisForm from './pages/AnalysisForm'
 import Results from './pages/Results'
 import BaseRates from './pages/BaseRates'
 import Upload from './pages/Upload'
+import Audit from './pages/Audit'
 
 function App() {
   const [currentHash, setCurrentHash] = useState(window.location.hash || '#/')
@@ -59,6 +60,8 @@ function App() {
         return <BaseRates onNavigate={navigate} />
       case 'upload':
         return <Upload onNavigate={navigate} onUseExtractedData={handleExtractedData} />
+      case 'audit':
+        return <Audit onNavigate={navigate} />
       default:
         return <Landing onNavigate={navigate} />
     }
@@ -82,6 +85,7 @@ function App() {
               { href: '#/analysis', label: 'Analysis', icon: '📋' },
               { href: '#/upload', label: 'Upload PDF', icon: '📄' },
               { href: '#/rates', label: 'Base Rates', icon: '💹' },
+              { href: '#/audit', label: 'Rate Audit', icon: '🔍' },
             ].map((item) => (
               <button
                 key={item.href}
