@@ -25,42 +25,47 @@ function WholesaleTimeSeriesChart({ swapHistory, bkbmHistory, width = 900, heigh
   ;(swapHistory || []).forEach(row => { swapByDate[row.date] = row })
   ;(bkbmHistory || []).forEach(row => { bkbmByDate[row.date] = row })
 
-  // Use swap dates as the primary axis (densest recent data)
-  // Then forward-fill BKBM/OCR values so they appear on every swap date
+  // Merge ALL dates from both swap and BKBM histories into one unified timeline
   const swapDates = Object.keys(swapByDate).sort()
   const allBkbmDates = Object.keys(bkbmByDate).sort()
+  const allDatesSet = new Set([...swapDates, ...allBkbmDates])
+  const sortedDates = [...allDatesSet].sort()
 
-  // For each swap date, find the most recent BKBM entry at or before that date
-  // This ensures OCR (which only changes at RBNZ meetings) fills across the chart
-  const filledBkbmByDate = {}
-  swapDates.forEach(date => {
-    // Start with any exact match
-    const exact = bkbmByDate[date]
-    const filled = exact ? { ...exact } : { date }
-
-    // For each BKBM tenor, if missing, find the most recent prior value
-    const bkbmKeys = ['OCR', 'BB90D']
-    bkbmKeys.forEach(key => {
-      if (filled[key] != null) return
-      // Walk backwards through bkbm dates to find the last known value
-      for (let i = allBkbmDates.length - 1; i >= 0; i--) {
-        if (allBkbmDates[i] <= date && bkbmByDate[allBkbmDates[i]][key] != null) {
-          filled[key] = bkbmByDate[allBkbmDates[i]][key]
-          break
-        }
-      }
-    })
-
-    filledBkbmByDate[date] = filled
-  })
-
-  const sortedDates = swapDates
   if (sortedDates.length < 2) {
     return <div className="text-gray-400 text-center py-8 text-sm">Not enough data for chart. Scrape some rates first.</div>
   }
 
-  // Override bkbmByDate reference for chart rendering
+  // Forward-fill BKBM/OCR: for each date, carry forward the last known BKBM value
+  const filledBkbmByDate = {}
+  const bkbmKeys = ['OCR', 'BB90D']
+  const lastKnownBkbm = {}
+  sortedDates.forEach(date => {
+    const exact = bkbmByDate[date]
+    const filled = exact ? { ...exact } : { date }
+    bkbmKeys.forEach(key => {
+      if (filled[key] != null) { lastKnownBkbm[key] = filled[key] }
+      else if (lastKnownBkbm[key] != null) { filled[key] = lastKnownBkbm[key] }
+    })
+    filledBkbmByDate[date] = filled
+  })
+
+  // Forward-fill Swap rates: carry forward last known swap value for each tenor
+  const filledSwapByDate = {}
+  const swapKeys = ['1Y', '2Y', '3Y', '4Y', '5Y', '7Y', '10Y']
+  const lastKnownSwap = {}
+  sortedDates.forEach(date => {
+    const exact = swapByDate[date]
+    const filled = exact ? { ...exact } : { date }
+    swapKeys.forEach(key => {
+      if (filled[key] != null) { lastKnownSwap[key] = filled[key] }
+      else if (lastKnownSwap[key] != null) { filled[key] = lastKnownSwap[key] }
+    })
+    filledSwapByDate[date] = filled
+  })
+
+  // Use filled versions for chart rendering
   const chartBkbmByDate = filledBkbmByDate
+  const chartSwapByDate = filledSwapByDate
 
   const padding = { top: 20, right: 160, bottom: 45, left: 55 }
   const cw = width - padding.left - padding.right
@@ -70,7 +75,7 @@ function WholesaleTimeSeriesChart({ swapHistory, bkbmHistory, width = 900, heigh
   let allVals = []
   sortedDates.forEach(date => {
     SERIES.forEach(s => {
-      const row = s.source === 'swap' ? swapByDate[date] : chartBkbmByDate[date]
+      const row = s.source === 'swap' ? chartSwapByDate[date] : chartBkbmByDate[date]
       if (row && row[s.key] != null) allVals.push(row[s.key])
     })
   })
@@ -90,7 +95,7 @@ function WholesaleTimeSeriesChart({ swapHistory, bkbmHistory, width = 900, heigh
   const seriesPaths = SERIES.map(s => {
     const points = []
     sortedDates.forEach((date, i) => {
-      const row = s.source === 'swap' ? swapByDate[date] : chartBkbmByDate[date]
+      const row = s.source === 'swap' ? chartSwapByDate[date] : chartBkbmByDate[date]
       if (row && row[s.key] != null) {
         points.push({ x: getX(i), y: getY(row[s.key]), val: row[s.key] })
       }
@@ -129,7 +134,10 @@ function WholesaleTimeSeriesChart({ swapHistory, bkbmHistory, width = 900, heigh
         {sortedDates.map((date, i) => {
           if (i % labelStep !== 0 && i !== sortedDates.length - 1) return null
           const x = getX(i)
-          const label = new Date(date + 'T00:00:00').toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' })
+          const d = new Date(date + 'T00:00:00')
+          const label = sortedDates.length > 100
+            ? d.toLocaleDateString('en-NZ', { month: 'short', year: '2-digit' })
+            : d.toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' })
           return (
             <g key={`xg-${i}`}>
               <line x1={x} y1={padding.top + ch} x2={x} y2={padding.top + ch + 5} stroke="#d1d5db" />
