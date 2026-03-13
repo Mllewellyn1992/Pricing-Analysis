@@ -18,18 +18,49 @@ function WholesaleTimeSeriesChart({ swapHistory, bkbmHistory, width = 900, heigh
     { key: '10Y',   label: 'Swap 10Y',      color: '#f97316', dash: '',     source: 'swap' },
   ]
 
-  // Merge all history into a single date-aligned dataset
-  const allDates = new Set()
+  // Build date-indexed lookups
   const swapByDate = {}
   const bkbmByDate = {}
 
-  ;(swapHistory || []).forEach(row => { swapByDate[row.date] = row; allDates.add(row.date) })
-  ;(bkbmHistory || []).forEach(row => { bkbmByDate[row.date] = row; allDates.add(row.date) })
+  ;(swapHistory || []).forEach(row => { swapByDate[row.date] = row })
+  ;(bkbmHistory || []).forEach(row => { bkbmByDate[row.date] = row })
 
-  const sortedDates = [...allDates].sort()
+  // Use swap dates as the primary axis (densest recent data)
+  // Then forward-fill BKBM/OCR values so they appear on every swap date
+  const swapDates = Object.keys(swapByDate).sort()
+  const allBkbmDates = Object.keys(bkbmByDate).sort()
+
+  // For each swap date, find the most recent BKBM entry at or before that date
+  // This ensures OCR (which only changes at RBNZ meetings) fills across the chart
+  const filledBkbmByDate = {}
+  swapDates.forEach(date => {
+    // Start with any exact match
+    const exact = bkbmByDate[date]
+    const filled = exact ? { ...exact } : { date }
+
+    // For each BKBM tenor, if missing, find the most recent prior value
+    const bkbmKeys = ['OCR', 'BB90D']
+    bkbmKeys.forEach(key => {
+      if (filled[key] != null) return
+      // Walk backwards through bkbm dates to find the last known value
+      for (let i = allBkbmDates.length - 1; i >= 0; i--) {
+        if (allBkbmDates[i] <= date && bkbmByDate[allBkbmDates[i]][key] != null) {
+          filled[key] = bkbmByDate[allBkbmDates[i]][key]
+          break
+        }
+      }
+    })
+
+    filledBkbmByDate[date] = filled
+  })
+
+  const sortedDates = swapDates
   if (sortedDates.length < 2) {
     return <div className="text-gray-400 text-center py-8 text-sm">Not enough data for chart. Scrape some rates first.</div>
   }
+
+  // Override bkbmByDate reference for chart rendering
+  const chartBkbmByDate = filledBkbmByDate
 
   const padding = { top: 20, right: 160, bottom: 45, left: 55 }
   const cw = width - padding.left - padding.right
@@ -39,7 +70,7 @@ function WholesaleTimeSeriesChart({ swapHistory, bkbmHistory, width = 900, heigh
   let allVals = []
   sortedDates.forEach(date => {
     SERIES.forEach(s => {
-      const row = s.source === 'swap' ? swapByDate[date] : bkbmByDate[date]
+      const row = s.source === 'swap' ? swapByDate[date] : chartBkbmByDate[date]
       if (row && row[s.key] != null) allVals.push(row[s.key])
     })
   })
@@ -59,7 +90,7 @@ function WholesaleTimeSeriesChart({ swapHistory, bkbmHistory, width = 900, heigh
   const seriesPaths = SERIES.map(s => {
     const points = []
     sortedDates.forEach((date, i) => {
-      const row = s.source === 'swap' ? swapByDate[date] : bkbmByDate[date]
+      const row = s.source === 'swap' ? swapByDate[date] : chartBkbmByDate[date]
       if (row && row[s.key] != null) {
         points.push({ x: getX(i), y: getY(row[s.key]), val: row[s.key] })
       }
