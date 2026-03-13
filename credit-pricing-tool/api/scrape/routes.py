@@ -265,10 +265,21 @@ def get_wholesale_rates(
     Returns current rates + time series history from the database.
     """
     try:
-        # Get latest rates (live scrape)
-        latest_rates = scrape_bkbm_swap_rates()
+        warnings = []
 
-        # Get history from database
+        # Try live scrape — report clearly if it fails
+        latest_rates = []
+        live_scrape_ok = False
+        try:
+            latest_rates = scrape_bkbm_swap_rates()
+            if latest_rates:
+                live_scrape_ok = True
+            else:
+                warnings.append("Live RBNZ scrape returned no data (Cloudflare 403). Using stored data from Supabase.")
+        except Exception as scrape_err:
+            warnings.append(f"Live RBNZ scrape failed: {str(scrape_err)}. Using stored data from Supabase.")
+
+        # Get history from database (primary data source — browser-scraped)
         bkbm_history = get_wholesale_history("bkbm", history_days)
         swap_history = get_wholesale_history("swap", history_days)
 
@@ -291,13 +302,14 @@ def get_wholesale_rates(
         bkbm_chart = sorted(bkbm_by_date.values(), key=lambda x: x["date"])
         swap_chart = sorted(swap_by_date.values(), key=lambda x: x["date"])
 
-        # Categorise latest rates
+        # Categorise latest rates from live scrape
         latest_bkbm = [r for r in latest_rates if r.get("rate_type") == "bkbm"]
         latest_swap = [r for r in latest_rates if r.get("rate_type") == "swap"]
 
-        # Fallback: if live scrape returned nothing, pull latest from DB history
+        # If live scrape failed, pull latest from DB history and tag source clearly
+        data_source = "live_scrape" if live_scrape_ok else "supabase_stored"
         if not latest_swap and swap_chart:
-            last_entry = swap_chart[-1]  # Most recent date
+            last_entry = swap_chart[-1]
             for tenor, rate in last_entry.items():
                 if tenor != "date" and isinstance(rate, (int, float)):
                     latest_swap.append({
@@ -305,7 +317,7 @@ def get_wholesale_rates(
                         "rate_pct": rate,
                         "tenor": tenor,
                         "rate_type": "swap",
-                        "source": "Supabase (latest stored)",
+                        "source": "Supabase (browser-scraped from interest.co.nz)",
                     })
 
         if not latest_bkbm and bkbm_chart:
@@ -313,11 +325,11 @@ def get_wholesale_rates(
             for tenor, rate in last_entry.items():
                 if tenor != "date" and isinstance(rate, (int, float)):
                     latest_bkbm.append({
-                        "rate_name": f"BKBM {tenor}",
+                        "rate_name": f"{tenor}",
                         "rate_pct": rate,
                         "tenor": tenor,
                         "rate_type": "bkbm",
-                        "source": "Supabase (latest stored)",
+                        "source": "Supabase (browser-scraped from interest.co.nz)",
                     })
 
         return {
@@ -330,6 +342,8 @@ def get_wholesale_rates(
                 "bkbm": bkbm_chart,
                 "swap": swap_chart,
             },
+            "data_source": data_source,
+            "warnings": warnings,
             "history_days": history_days,
             "scraped_at": datetime.utcnow().isoformat() + "Z",
             "source": "interest.co.nz / Supabase history",

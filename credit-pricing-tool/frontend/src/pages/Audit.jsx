@@ -3,6 +3,151 @@ import React from 'react'
 import { getAuditLog, triggerScrape, getBankHistory, getWholesaleRates, injectWholesaleRates } from '../api'
 
 /**
+ * Combined multi-line time-series chart for swap rates, bank bill, and OCR
+ */
+function WholesaleTimeSeriesChart({ swapHistory, bkbmHistory, width = 900, height = 420 }) {
+  // Line definitions: which series to show and their colors
+  const SERIES = [
+    { key: 'OCR',   label: 'OCR',          color: '#ef4444', dash: '6,3',  source: 'bkbm' },
+    { key: 'BB90D', label: 'Bank Bill 90D', color: '#f59e0b', dash: '',     source: 'bkbm' },
+    { key: '1Y',    label: 'Swap 1Y',       color: '#3b82f6', dash: '',     source: 'swap' },
+    { key: '2Y',    label: 'Swap 2Y',       color: '#8b5cf6', dash: '',     source: 'swap' },
+    { key: '3Y',    label: 'Swap 3Y',       color: '#06b6d4', dash: '',     source: 'swap' },
+    { key: '5Y',    label: 'Swap 5Y',       color: '#10b981', dash: '',     source: 'swap' },
+    { key: '7Y',    label: 'Swap 7Y',       color: '#ec4899', dash: '',     source: 'swap' },
+    { key: '10Y',   label: 'Swap 10Y',      color: '#f97316', dash: '',     source: 'swap' },
+  ]
+
+  // Merge all history into a single date-aligned dataset
+  const allDates = new Set()
+  const swapByDate = {}
+  const bkbmByDate = {}
+
+  ;(swapHistory || []).forEach(row => { swapByDate[row.date] = row; allDates.add(row.date) })
+  ;(bkbmHistory || []).forEach(row => { bkbmByDate[row.date] = row; allDates.add(row.date) })
+
+  const sortedDates = [...allDates].sort()
+  if (sortedDates.length < 2) {
+    return <div className="text-gray-400 text-center py-8 text-sm">Not enough data for chart. Scrape some rates first.</div>
+  }
+
+  const padding = { top: 20, right: 160, bottom: 45, left: 55 }
+  const cw = width - padding.left - padding.right
+  const ch = height - padding.top - padding.bottom
+
+  // Gather all values across all series for Y scale
+  let allVals = []
+  sortedDates.forEach(date => {
+    SERIES.forEach(s => {
+      const row = s.source === 'swap' ? swapByDate[date] : bkbmByDate[date]
+      if (row && row[s.key] != null) allVals.push(row[s.key])
+    })
+  })
+  if (allVals.length === 0) {
+    return <div className="text-gray-400 text-center py-8 text-sm">No rate data found in history.</div>
+  }
+
+  const minVal = Math.floor(Math.min(...allVals) * 2) / 2  // Round down to nearest 0.5
+  const maxVal = Math.ceil(Math.max(...allVals) * 2) / 2    // Round up to nearest 0.5
+  const range = maxVal - minVal || 1
+
+  const xScale = cw / (sortedDates.length - 1)
+  const getX = (i) => padding.left + i * xScale
+  const getY = (val) => padding.top + ch - ((val - minVal) / range) * ch
+
+  // Build paths for each series
+  const seriesPaths = SERIES.map(s => {
+    const points = []
+    sortedDates.forEach((date, i) => {
+      const row = s.source === 'swap' ? swapByDate[date] : bkbmByDate[date]
+      if (row && row[s.key] != null) {
+        points.push({ x: getX(i), y: getY(row[s.key]), val: row[s.key] })
+      }
+    })
+    if (points.length < 2) return null
+    const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+    return { ...s, d, lastPoint: points[points.length - 1] }
+  }).filter(Boolean)
+
+  // Y grid lines
+  const yGridCount = Math.min(8, Math.ceil(range / 0.5) + 1)
+  const yStep = range / (yGridCount - 1)
+  const yGridLines = Array.from({ length: yGridCount }, (_, i) => minVal + i * yStep)
+
+  // X date labels
+  const labelStep = Math.max(1, Math.floor(sortedDates.length / 6))
+
+  return (
+    <div className="overflow-x-auto">
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="w-full">
+        {/* Background */}
+        <rect x={padding.left} y={padding.top} width={cw} height={ch} fill="#fafafa" />
+
+        {/* Y grid + labels */}
+        {yGridLines.map((val, i) => {
+          const y = getY(val)
+          return (
+            <g key={`yg-${i}`}>
+              <line x1={padding.left} y1={y} x2={padding.left + cw} y2={y} stroke="#e5e7eb" strokeWidth="1" />
+              <text x={padding.left - 8} y={y + 4} textAnchor="end" fontSize="10" fill="#6b7280">{val.toFixed(1)}%</text>
+            </g>
+          )
+        })}
+
+        {/* X date labels */}
+        {sortedDates.map((date, i) => {
+          if (i % labelStep !== 0 && i !== sortedDates.length - 1) return null
+          const x = getX(i)
+          const label = new Date(date + 'T00:00:00').toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' })
+          return (
+            <g key={`xg-${i}`}>
+              <line x1={x} y1={padding.top + ch} x2={x} y2={padding.top + ch + 5} stroke="#d1d5db" />
+              <text x={x} y={height - 8} textAnchor="middle" fontSize="9" fill="#9ca3af">{label}</text>
+            </g>
+          )
+        })}
+
+        {/* Data lines */}
+        {seriesPaths.map(s => (
+          <path
+            key={s.key}
+            d={s.d}
+            fill="none"
+            stroke={s.color}
+            strokeWidth={s.key === 'OCR' ? 2.5 : 1.8}
+            strokeDasharray={s.dash}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+
+        {/* End labels (legend on right side) */}
+        {seriesPaths.map((s, i) => {
+          if (!s.lastPoint) return null
+          return (
+            <g key={`lbl-${s.key}`}>
+              <circle cx={s.lastPoint.x} cy={s.lastPoint.y} r="3" fill={s.color} />
+              <text
+                x={padding.left + cw + 8}
+                y={s.lastPoint.y + 4}
+                fontSize="10"
+                fontWeight="600"
+                fill={s.color}
+              >
+                {s.label} {s.lastPoint.val.toFixed(2)}%
+              </text>
+            </g>
+          )
+        })}
+
+        {/* Axis border */}
+        <rect x={padding.left} y={padding.top} width={cw} height={ch} fill="none" stroke="#d1d5db" />
+      </svg>
+    </div>
+  )
+}
+
+/**
  * Simple SVG line chart for rate history
  */
 function RateChart({ data, width = 600, height = 220, title, color = '#3b82f6' }) {
@@ -270,68 +415,76 @@ function Audit({ onNavigate }) {
         </div>
       </div>
 
-      {/* Wholesale Rates (Swap & BKBM) Section */}
+      {/* Warnings from API */}
+      {wholesaleData?.warnings?.length > 0 && (
+        <div className="card bg-amber-50 border border-amber-200 p-4 mb-6">
+          <p className="font-medium text-amber-800 mb-1">Data Source Warnings</p>
+          {wholesaleData.warnings.map((w, i) => (
+            <p key={i} className="text-sm text-amber-700">{w}</p>
+          ))}
+        </div>
+      )}
+
+      {/* Combined Time-Series Chart */}
       <div className="card overflow-hidden mb-8">
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Wholesale Rates (Swap & BKBM)</h2>
+              <h2 className="text-lg font-semibold text-gray-900">NZ Wholesale Rate Curves</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Current NZ interest rate swap curves — sourced from{' '}
-                <a
-                  href="https://www.interest.co.nz/charts/interest-rates/swap-rates"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  interest.co.nz/charts/interest-rates/swap-rates
-                </a>
+                Swap rates, 90-day Bank Bill, and OCR — sourced from{' '}
+                <a href="https://www.interest.co.nz/charts/interest-rates/swap-rates" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">interest.co.nz</a>
+                {wholesaleData?.data_source && (
+                  <span className={`ml-2 inline-block px-2 py-0.5 text-xs rounded-full ${
+                    wholesaleData.data_source === 'live_scrape'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {wholesaleData.data_source === 'live_scrape' ? 'Live' : 'Stored data'}
+                  </span>
+                )}
               </p>
             </div>
-            <button
-              onClick={loadWholesaleData}
-              disabled={wholesaleLoading}
-              className="btn-secondary text-sm flex items-center gap-1"
-            >
+            <button onClick={loadWholesaleData} disabled={wholesaleLoading} className="btn-secondary text-sm flex items-center gap-1">
               {wholesaleLoading ? (
-                <>
-                  <span className="inline-block animate-spin h-3 w-3 border-2 border-primary border-t-transparent rounded-full" />
-                  Loading...
-                </>
-              ) : (
-                'Refresh'
-              )}
+                <><span className="inline-block animate-spin h-3 w-3 border-2 border-primary border-t-transparent rounded-full" /> Loading...</>
+              ) : 'Refresh'}
             </button>
           </div>
         </div>
 
         <div className="p-6">
+          <WholesaleTimeSeriesChart
+            swapHistory={wholesaleData?.history?.swap || []}
+            bkbmHistory={wholesaleData?.history?.bkbm || []}
+          />
+        </div>
+      </div>
+
+      {/* Current Rate Snapshot Cards */}
+      <div className="card overflow-hidden mb-8">
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Latest Rate Snapshot</h2>
+        </div>
+        <div className="p-6">
           {wholesaleData?.latest?.swap?.length > 0 || wholesaleData?.latest?.bkbm?.length > 0 ? (
             <div className="space-y-6">
-              {/* Current Swap Rates Table */}
               {wholesaleData.latest.swap?.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Current Swap Rates</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Swap Rates</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
                     {wholesaleData.latest.swap.map(rate => (
                       <div key={rate.tenor || rate.rate_name} className="bg-blue-50 rounded-lg p-3 text-center">
                         <p className="text-xs text-blue-600 font-medium">{rate.tenor || rate.rate_name}</p>
                         <p className="text-xl font-bold text-blue-900">{rate.rate_pct?.toFixed(2)}%</p>
-                        {rate.source && (
-                          <p className="text-xs text-blue-400 mt-1 truncate" title={rate.source}>
-                            {rate.source}
-                          </p>
-                        )}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
-              {/* Current BKBM Rates Table */}
               {wholesaleData.latest.bkbm?.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Current BKBM Rates</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">OCR & Bank Bill</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
                     {wholesaleData.latest.bkbm.map(rate => (
                       <div key={rate.tenor || rate.rate_name} className="bg-green-50 rounded-lg p-3 text-center">
@@ -342,31 +495,13 @@ function Audit({ onNavigate }) {
                   </div>
                 </div>
               )}
-
-              {/* Scraped timestamp */}
               <p className="text-xs text-gray-400 text-right">
-                Last scraped: {wholesaleData.scraped_at
-                  ? new Date(wholesaleData.scraped_at).toLocaleString('en-NZ')
-                  : 'Unknown'}
+                Last updated: {wholesaleData.scraped_at ? new Date(wholesaleData.scraped_at).toLocaleString('en-NZ') : 'Unknown'}
               </p>
             </div>
           ) : (
             <div className="text-center py-6">
-              <p className="text-gray-500 text-sm mb-2">
-                No wholesale rate data available yet.
-              </p>
-              <p className="text-gray-400 text-xs">
-                Swap rates are scraped from{' '}
-                <a
-                  href="https://www.interest.co.nz/charts/interest-rates/swap-rates"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  interest.co.nz
-                </a>{' '}
-                via browser automation. Run a full scrape or use the data injection API.
-              </p>
+              <p className="text-gray-500 text-sm">No wholesale rate data available yet. Run a browser scrape to collect data.</p>
             </div>
           )}
         </div>
