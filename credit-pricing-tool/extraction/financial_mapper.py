@@ -52,64 +52,95 @@ FINANCIAL_FIELDS = {
 }
 
 # Section headers that indicate financial statements (in priority order)
-_SECTION_MARKERS = [
-    # Primary financial statements
-    "statement of comprehensive income",
+# "Critical" markers get the widest capture window (5000 chars) to avoid
+# truncating dense pages where income statement + balance sheet share a page.
+_CRITICAL_MARKERS = [
+    "consolidated income statement",
     "income statement",
     "profit or loss",
     "profit and loss",
+    "consolidated balance sheet",
     "statement of financial position",
     "balance sheet",
+    "consolidated statement of cash flows",
     "statement of cash flows",
     "cash flow statement",
+]
+
+_PRIMARY_MARKERS = [
+    "statement of comprehensive income",
     "statement of changes in equity",
-    # Key line items (fallback if no headers found)
+    "net debt",
+    "bank and debt facilities",
+    "borrowings",
+    "segment information",
+    "operating performance",
+]
+
+_SECONDARY_MARKERS = [
     "revenue",
+    "retail sales",
     "total assets",
     "total equity",
     "cash flows from operating",
     "profit before tax",
+    "net cash flows from operating",
+    "operating profit",
+    "earnings before interest",
 ]
 
 
 def _find_financial_sections(raw_text: str) -> list:
-    """Scan text for financial statement sections, classifying each as primary or secondary.
+    """Scan text for financial statement sections, classifying each by priority.
 
-    Returns list of (start, end, marker, is_primary) tuples.
+    Returns list of (start, end, marker, priority) tuples.
+    Priority: 0 = critical (income stmt, balance sheet, cash flow)
+              1 = primary  (comprehensive income, equity changes, debt notes)
+              2 = secondary (individual line items as fallback)
     """
     text_lower = raw_text.lower()
     sections = []
 
-    for marker in _SECTION_MARKERS:
-        start = 0
-        while True:
-            idx = text_lower.find(marker, start)
-            if idx == -1:
-                break
+    def _scan(markers, priority, context_before, context_after_dense, context_after_sparse):
+        for marker in markers:
+            start = 0
+            while True:
+                idx = text_lower.find(marker, start)
+                if idx == -1:
+                    break
 
-            context = raw_text[idx:min(len(raw_text), idx + 400)]
-            number_count = len(re.findall(r"\d{3,}", context))
+                # Look ahead to see how number-dense the following text is
+                context = raw_text[idx:min(len(raw_text), idx + 600)]
+                number_count = len(re.findall(r"\d{3,}", context))
 
-            if number_count >= 3:
-                sec_start = max(0, idx - 100)
-                sec_end = min(len(raw_text), idx + 3000)
-                sections.append((sec_start, sec_end, marker, True))
-            elif number_count >= 1:
-                sec_start = max(0, idx - 50)
-                sec_end = min(len(raw_text), idx + 1500)
-                sections.append((sec_start, sec_end, marker, False))
+                if number_count >= 3:
+                    sec_start = max(0, idx - context_before)
+                    sec_end = min(len(raw_text), idx + context_after_dense)
+                    sections.append((sec_start, sec_end, marker, priority))
+                elif number_count >= 1:
+                    sec_start = max(0, idx - 50)
+                    sec_end = min(len(raw_text), idx + context_after_sparse)
+                    sections.append((sec_start, sec_end, marker, priority))
 
-            start = idx + len(marker)
+                start = idx + len(marker)
+
+    # Critical statements: capture up to 5000 chars after (handles dense pages
+    # where income statement + balance sheet share one PDF page)
+    _scan(_CRITICAL_MARKERS, priority=0, context_before=200, context_after_dense=5000, context_after_sparse=2000)
+    # Primary supplementary statements/notes
+    _scan(_PRIMARY_MARKERS, priority=1, context_before=100, context_after_dense=3000, context_after_sparse=1500)
+    # Secondary line-item fallbacks
+    _scan(_SECONDARY_MARKERS, priority=2, context_before=50, context_after_dense=2000, context_after_sparse=1000)
 
     return sections
 
 
 def _merge_overlapping_sections(secs):
-    """Sort sections by position and merge overlapping ones (within 200 char gap)."""
+    """Sort sections by position and merge overlapping ones (within 300 char gap)."""
     secs.sort(key=lambda x: x[0])
     merged = []
     for start, end, marker in secs:
-        if merged and start <= merged[-1][1] + 200:
+        if merged and start <= merged[-1][1] + 300:
             merged[-1] = (merged[-1][0], max(merged[-1][1], end), merged[-1][2])
         else:
             merged.append((start, end, marker))
@@ -126,9 +157,16 @@ def _collect_text_within_budget(raw_text, section_groups, max_chars):
     """
     parts = []
     total_chars = 0
+    seen_ranges = set()
 
     for sections in section_groups:
         for start, end, _marker in sections:
+            # Deduplicate: skip if this range is largely contained in an already-added range
+            chunk_key = (start // 500, end // 500)
+            if chunk_key in seen_ranges:
+                continue
+            seen_ranges.add(chunk_key)
+
             chunk = raw_text[start:end]
             if total_chars + len(chunk) > max_chars:
                 remaining = max_chars - total_chars
@@ -142,12 +180,15 @@ def _collect_text_within_budget(raw_text, section_groups, max_chars):
     return parts
 
 
-def _extract_relevant_sections(raw_text: str, max_chars: int = 20000) -> str:
+def _extract_relevant_sections(raw_text: str, max_chars: int = 35000) -> str:
     """Extract the most financially-relevant sections from raw PDF text.
 
     Finds financial statement headers, prioritises sections with numeric data,
     and deduplicates overlapping sections within a character budget.
     Falls back to first max_chars characters if no sections found.
+
+    Budget: 35,000 chars by default — enough for income statement + balance sheet
+    + cash flow + key notes (debt, equity) even when pages are dense.
     """
     if len(raw_text) <= max_chars:
         return raw_text
@@ -156,18 +197,25 @@ def _extract_relevant_sections(raw_text: str, max_chars: int = 20000) -> str:
     if not sections:
         return raw_text[:max_chars]
 
-    primary = [(s, e, m) for s, e, m, is_primary in sections if is_primary]
-    secondary = [(s, e, m) for s, e, m, is_primary in sections if not is_primary]
+    critical = [(s, e, m) for s, e, m, prio in sections if prio == 0]
+    primary = [(s, e, m) for s, e, m, prio in sections if prio == 1]
+    secondary = [(s, e, m) for s, e, m, prio in sections if prio == 2]
 
+    critical_merged = _merge_overlapping_sections(critical)
     primary_merged = _merge_overlapping_sections(primary)
     secondary_merged = _merge_overlapping_sections(secondary)
 
-    parts = _collect_text_within_budget(raw_text, [primary_merged, secondary_merged], max_chars)
+    parts = _collect_text_within_budget(
+        raw_text,
+        [critical_merged, primary_merged, secondary_merged],
+        max_chars,
+    )
 
     result = "\n...\n".join(parts)
     logger.info(
         f"Extracted {len(result)} relevant chars from {len(raw_text)} total "
-        f"({len(primary_merged)} primary + {len(secondary_merged)} secondary sections)"
+        f"({len(critical_merged)} critical + {len(primary_merged)} primary "
+        f"+ {len(secondary_merged)} secondary sections)"
     )
     return result
 
@@ -195,41 +243,76 @@ def _build_extraction_prompt(relevant_text: str, table_text: str) -> str:
     fields_str = "\n".join(
         f"- {field}: {desc}" for field, desc in FINANCIAL_FIELDS.items()
     )
-    return f"""You are a financial data extraction expert. Extract financial data from the following financial statement.
+    return f"""You are a financial data extraction expert specialising in New Zealand annual reports.
 
 DOCUMENT TEXT:
 {relevant_text}
 {table_text}
 
 TASK:
-Extract the following financial fields from the document above. Only extract values that you can identify with reasonable confidence.
+Extract the following financial fields from the MOST RECENT YEAR in the document.
 
-IMPORTANT - UNIT CONVERSION:
-Report ALL values in THOUSANDS (000s) of the local currency.
+═══════════════════════════════════════════════════════════
+CRITICAL WARNING — NOTE REFERENCES ARE NOT VALUES!
+═══════════════════════════════════════════════════════════
+NZ annual reports put note references (e.g. "2.1", "3.3", "4.2", "8.1", "10.3", "11.2")
+inline BEFORE the actual numeric values. For example:
 
-STEP 1: Determine the document's reporting unit FIRST by looking for explicit indicators:
-- "$000", "'000", "Expressed in thousands", "in thousands of NZ dollars" → THOUSANDS (use values as-is)
-- "$M", "in millions", "NZ$m" → MILLIONS (multiply by 1,000 to get thousands)
-- "$B", "in billions" → BILLIONS (multiply by 1,000,000 to get thousands)
-- "$", "NZ$" with NO scale indicator → WHOLE DOLLARS (divide by 1,000 to get thousands)
+   "Cash and cash equivalents  11.2    39,206"
+     → "11.2" is a NOTE REFERENCE, "39,206" is the VALUE
+   "Depreciation and amortisation expense  3.3  156,524"
+     → "3.3" is a NOTE REFERENCE, "156,524" is the VALUE
+   "Retail sales  2.1  3,086,725"
+     → "2.1" is a NOTE REFERENCE, "3,086,725" is the VALUE
+   "Minority interest  11.5  337"
+     → "11.5" is a NOTE REFERENCE, "337" is the VALUE
 
-STEP 2: Verify by checking if the resulting thousands values make sense:
-- A small NZ company typically has revenue of 500-50,000 (i.e. $500K-$50M)
-- A large NZ company typically has revenue of 50,000-10,000,000 (i.e. $50M-$10B)
-- If revenue comes out as 0.5-50 in thousands (i.e. $500-$50,000), you likely divided by too much
-- If revenue comes out as 500,000,000+ in thousands (i.e. $500B+), you likely multiplied too much
+NEVER extract note references as financial values.
+Note references are typically 1-2 digit numbers with a decimal (e.g. "2.1", "11.2").
+Financial values are typically 3+ digit numbers, often with commas (e.g. "39,206", "3,086,725").
 
-STEP 3: Common NZ annual report patterns:
-- Many NZ companies report in WHOLE DOLLARS with values like "1,562,674" or "37,678,302"
-- If you see numbers with 6+ digits and commas (e.g., "1,234,567") and NO "$000" indicator, these are WHOLE DOLLARS → divide by 1,000
-- If you see numbers with 3-4 digits (e.g., "1,234") and a "$000" indicator, they are already in thousands
-- Property companies may show values in tens of millions in whole dollars — still divide by 1,000
+Also NEVER extract reporting period numbers as values:
+   "53 Weeks" / "52 Weeks" → these describe the reporting period, NOT financial values.
+
+═══════════════════════════════════════════════════════════
+UNIT CONVERSION — Report ALL values in THOUSANDS (000s)
+═══════════════════════════════════════════════════════════
+
+STEP 1: Determine the document's reporting unit:
+- "$000", "'000", "$ 000", "in thousands" → THOUSANDS (use values as-is)
+- "$M", "in millions", "NZ$m" → MILLIONS (multiply by 1,000)
+- "$B", "in billions" → BILLIONS (multiply by 1,000,000)
+- "$", "NZ$" with NO scale indicator → WHOLE DOLLARS (divide by 1,000)
+
+STEP 2: Sanity check — NZ companies:
+- Small: revenue 500–50,000 ($000) i.e. $500K–$50M
+- Medium: revenue 50,000–500,000 ($000) i.e. $50M–$500M
+- Large: revenue 500,000–10,000,000 ($000) i.e. $500M–$10B
+
+═══════════════════════════════════════════════════════════
+WHERE TO FIND EACH FIELD
+═══════════════════════════════════════════════════════════
+- revenue_mn: Look for "Revenue", "Retail sales", "Net sales", "Sales" in the INCOME STATEMENT
+  (NOT in narrative summaries or "at a glance" sections)
+- ebit_mn: "Operating profit", "Earnings before interest and tax", "EBIT" in INCOME STATEMENT
+- depreciation_mn: "Depreciation" or "Depreciation and amortisation" in INCOME STATEMENT or notes
+- interest_expense_mn: "Interest expense", "Interest on leases" + "Other net interest",
+  "Finance costs" in INCOME STATEMENT (NOT "Other income")
+- cfo_mn: "Net cash flows from operating activities" in CASH FLOW STATEMENT
+- capex_mn: "Purchase of property, plant and equipment" or "Capital expenditure" in CASH FLOW STATEMENT
+  (report as POSITIVE number even if shown as negative in the statement)
+- cash_mn: "Cash and cash equivalents" in BALANCE SHEET
+- total_equity_mn: "Total equity" in BALANCE SHEET
+- total_debt_mn: "Borrowings" or total of short-term + long-term debt in BALANCE SHEET
+- assets_current_mn: "Total assets" for CURRENT YEAR in BALANCE SHEET
+- assets_prior_mn: "Total assets" for PRIOR YEAR in BALANCE SHEET
+- common_dividends_mn: "Dividends paid" in CASH FLOW STATEMENT or dividend notes
 
 FIELDS TO EXTRACT:
 {fields_str}
 
 RESPONSE FORMAT:
-Return ONLY a valid JSON object with this structure (no other text):
+Return ONLY a valid JSON object (no other text):
 {{
   "fields": {{
     "field_name": number_in_thousands,
@@ -239,26 +322,27 @@ Return ONLY a valid JSON object with this structure (no other text):
     "field_name": 0.0_to_1.0,
     "another_field": null
   }},
-  "currency": "USD|NZD|GBP|etc or UNKNOWN",
-  "fiscal_period": "FY2024|Q1 2024|etc or UNKNOWN",
+  "currency": "NZD|USD|GBP|etc or UNKNOWN",
+  "fiscal_period": "FY2025|FY2024|etc or UNKNOWN",
   "source_units": "thousands|millions|dollars|unknown",
-  "notes": "any important notes about the extraction including what unit the document uses"
+  "notes": "brief notes about the extraction"
 }}
 
 CONFIDENCE SCORING:
-- 0.95+: Found exact value in financial statements
-- 0.80-0.94: High confidence, but slight ambiguity
+- 0.95+: Found exact labeled value in a primary financial statement
+- 0.80-0.94: High confidence from financial statement but slight ambiguity
 - 0.60-0.79: Reasonable confidence, calculated or inferred
 - 0.40-0.59: Low confidence, uncertain
-- Below 0.40: Don't include in response (use null instead)
+- Below 0.40: Use null
 
-CRITICAL RULES:
-1. Only include fields you are confident about (confidence >= 0.40)
+RULES:
+1. Only include fields with confidence >= 0.40
 2. Return null for fields you cannot find
-3. All numbers must be converted to THOUSANDS
-4. If a field is 0 or missing, return null, not 0
-5. Validate debt components sum reasonably if multiple debt fields found
-6. Pay careful attention to the units used in the document (look for "$000", "in thousands", "$M", etc.)
+3. All numbers must be in THOUSANDS
+4. Use null (not 0) for missing fields
+5. Extract from the FORMAL FINANCIAL STATEMENTS, not from narrative summaries, "at a glance" pages, or management commentary
+6. Capex should be a POSITIVE number (it represents cash spent)
+7. Interest expense: include BOTH lease interest and other interest if available
 """
 
 
@@ -382,15 +466,22 @@ def map_financials_with_ai(
 
     client = anthropic.Anthropic(api_key=api_key)
 
+    # Key fields that a well-extracted financial statement should have
+    _CORE_FIELDS = {
+        "revenue_mn", "ebit_mn", "depreciation_mn", "cash_mn",
+        "total_equity_mn", "cfo_mn", "capex_mn", "assets_current_mn",
+    }
+    _MIN_FIELDS_THRESHOLD = 8  # Retry if fewer than this many fields extracted
+
     table_text = _build_table_text(tables)
-    relevant_text = _extract_relevant_sections(raw_text, max_chars=20000)
+    relevant_text = _extract_relevant_sections(raw_text, max_chars=35000)
     prompt = _build_extraction_prompt(relevant_text, table_text)
 
     try:
         logger.debug("Calling Claude API for financial field extraction")
         response_text = _call_claude_with_retry(
             client,
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-4-6",
             max_tokens=2048,
             prompt=prompt,
             max_retries=2,
@@ -398,6 +489,39 @@ def map_financials_with_ai(
 
         result = _extract_json_from_response(response_text)
         fields, confidence, errors = _validate_and_clean_response(result)
+
+        # ── Field completeness check: retry with expanded context if too few fields ──
+        extracted_core = set(fields.keys()) & _CORE_FIELDS
+        if len(fields) < _MIN_FIELDS_THRESHOLD or len(extracted_core) < 5:
+            logger.warning(
+                f"Incomplete extraction: {len(fields)} fields ({len(extracted_core)} core). "
+                f"Retrying with expanded context."
+            )
+            # Retry with full text (up to 45k chars) to capture anything missed
+            expanded_text = _extract_relevant_sections(raw_text, max_chars=45000)
+            if len(expanded_text) > len(relevant_text) + 1000:
+                retry_prompt = _build_extraction_prompt(expanded_text, table_text)
+                retry_response = _call_claude_with_retry(
+                    client,
+                    model="claude-sonnet-4-6",
+                    max_tokens=2048,
+                    prompt=retry_prompt,
+                    max_retries=1,
+                )
+                retry_result = _extract_json_from_response(retry_response)
+                retry_fields, retry_confidence, retry_errors = _validate_and_clean_response(retry_result)
+
+                # Use retry result if it found more fields
+                if len(retry_fields) > len(fields):
+                    logger.info(
+                        f"Retry improved extraction: {len(fields)} → {len(retry_fields)} fields"
+                    )
+                    fields = retry_fields
+                    confidence = retry_confidence
+                    errors = retry_errors
+                    result = retry_result
+                else:
+                    logger.info("Retry did not improve extraction, keeping original")
 
         return {
             "fields": fields,
@@ -642,7 +766,7 @@ def validate_and_fix_extraction(
                 return extraction_result
 
             client = anthropic.Anthropic(api_key=api_key)
-            relevant_text = _extract_relevant_sections(raw_text, max_chars=15000)
+            relevant_text = _extract_relevant_sections(raw_text, max_chars=35000)
             prompt = _build_reextraction_prompt(relevant_text, error_items, fields)
 
             logger.info(f"Running targeted AI re-extraction for {len(error_items)} flagged fields")

@@ -942,14 +942,37 @@ def extract_text_from_pdf(pdf_path: str) -> str:
 
 
 def _extract_tables_with_pdfplumber(pdf_path: str) -> List[Dict[str, Any]]:
-    """Extract tables from PDF using pdfplumber."""
+    """Extract tables from PDF using pdfplumber.
+
+    For large PDFs (>20 pages), only processes pages within the financial
+    statement range identified by _find_financial_page_range() to avoid
+    wasting time on governance, notes, and statutory pages.
+    """
     import pdfplumber
+
+    # Determine which pages to process
+    fs_start, fs_end = _find_financial_page_range(pdf_path)
 
     tables = []
     with pdfplumber.open(pdf_path) as pdf:
-        for page_num, page in enumerate(pdf.pages, 1):
+        total_pages = len(pdf.pages)
+
+        # For large PDFs, only process financial statement pages
+        if total_pages > 20:
+            start_idx = max(0, fs_start)
+            end_idx = min(total_pages, fs_end)
+            pages_to_process = range(start_idx, end_idx)
+            logger.info(
+                f"Table extraction: processing pages {start_idx+1}-{end_idx} "
+                f"of {total_pages} (financial statement range)"
+            )
+        else:
+            pages_to_process = range(total_pages)
+
+        for page_idx in pages_to_process:
+            page_num = page_idx + 1
             try:
-                page_tables = page.extract_tables()
+                page_tables = pdf.pages[page_idx].extract_tables()
                 if not page_tables:
                     continue
 
