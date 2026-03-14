@@ -312,6 +312,9 @@ WHERE TO FIND EACH FIELD
 - revenue_mn: Look for "Revenue", "Retail sales", "Net sales", "Sales" in the INCOME STATEMENT
   (NOT in narrative summaries or "at a glance" sections)
 - ebit_mn: "Operating profit", "Earnings before interest and tax", "EBIT" in INCOME STATEMENT
+  If no explicit EBIT line, CALCULATE it: Total Revenue - Operating Expenses - D&A
+  OR if you see EBITDAF/EBITDA, calculate: EBITDAF - Depreciation - Amortisation
+  OR calculate: Profit before tax + Finance costs (excluding imputed interest on deposits)
 - cfo_mn: "Net cash flows from operating activities" in CASH FLOW STATEMENT
 - capex_mn: "Purchase of property, plant and equipment" or "Capital expenditure" in CASH FLOW STATEMENT
   (report as POSITIVE number even if shown as negative in the statement)

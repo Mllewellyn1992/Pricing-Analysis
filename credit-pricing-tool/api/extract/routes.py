@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="extract")
 
 # ── Simple in-memory extraction cache (file hash → result) ───────────────────
+# Cache version: increment when extraction logic changes to invalidate stale results
+_CACHE_VERSION = "v3_ifrs16"
 _extraction_cache: Dict[str, dict] = {}
 _CACHE_MAX_SIZE = 20  # Keep last 20 extractions
 
@@ -236,19 +238,20 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
         # ── Step 1: Save upload ──────────────────────────────────────────
         temp_path, file_size_mb, file_hash = await _save_upload_to_temp(file, request_id)
 
-        # ── Step 1.5: Check cache ────────────────────────────────────────
-        if file_hash in _extraction_cache:
-            cached = _extraction_cache[file_hash]
+        # ── Step 1.5: Check cache (versioned to invalidate on code changes) ──
+        cache_key = f"{_CACHE_VERSION}:{file_hash}"
+        if cache_key in _extraction_cache:
+            cached = _extraction_cache[cache_key]
             # Only serve cached result if it was an AI extraction (not heuristic fallback)
             if cached.get("extraction_method") == "ai":
-                logger.info(f"[{request_id}] Cache HIT for {file_hash[:12]}")
+                logger.info(f"[{request_id}] Cache HIT for {cache_key[:20]}")
                 cached_response = ExtractionResponse(**cached)
                 cached_response.request_id = request_id
                 cached_response.message = f"Cached result: {cached_response.message}"
                 return cached_response
             else:
-                logger.info(f"[{request_id}] Cache SKIP for {file_hash[:12]} (was heuristic, re-extracting)")
-                del _extraction_cache[file_hash]
+                logger.info(f"[{request_id}] Cache SKIP for {cache_key[:20]} (was heuristic, re-extracting)")
+                del _extraction_cache[cache_key]
 
         # ── Step 2: Text extraction (with timeout) ───────────────────────
         try:
@@ -437,7 +440,7 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
         cache_copy = {**response_data}
         if cache_copy["sector_classification"]:
             cache_copy["sector_classification"] = cache_copy["sector_classification"].model_dump()
-        _extraction_cache[file_hash] = cache_copy
+        _extraction_cache[cache_key] = cache_copy
 
         return ExtractionResponse(**response_data)
 

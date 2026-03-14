@@ -3,13 +3,18 @@ import { analyzeFinancials, getAllProducts, uploadPDF, pingServer } from '../api
 
 const EXTRACTION_TO_FORM = {
   revenue_mn: 'revenue', ebit_mn: 'ebit', depreciation_mn: 'depreciation',
+  depreciation_ppe_mn: 'depreciationPpe', depreciation_rou_mn: 'depreciationRou',
   amortization_mn: 'amortization', interest_expense_mn: 'interestExpense',
+  interest_debt_mn: 'interestDebt', interest_lease_mn: 'interestLease',
   cash_interest_paid_mn: 'cashInterestPaid', cash_taxes_paid_mn: 'cashTaxesPaid',
   total_debt_mn: 'totalDebt', st_debt_mn: 'stDebt', cpltd_mn: 'cpltd',
-  lt_debt_net_mn: 'ltDebt', capital_leases_mn: 'capitalLeases', cash_mn: 'cash',
-  cash_like_mn: 'cashLikeAssets', total_equity_mn: 'totalEquity',
+  lt_debt_net_mn: 'ltDebt',
+  lease_liabilities_mn: 'leaseTotal', lease_liabilities_current_mn: 'leaseCurrent',
+  lease_liabilities_noncurrent_mn: 'leaseNoncurrent', rou_assets_mn: 'rouAssets',
+  cash_mn: 'cash', cash_like_mn: 'cashLikeAssets', total_equity_mn: 'totalEquity',
   minority_interest_mn: 'minorityInterest', deferred_taxes_mn: 'deferredTaxes',
-  cfo_mn: 'cfo', capex_mn: 'capex', common_dividends_mn: 'commonDividends',
+  cfo_mn: 'cfo', capex_mn: 'capex', lease_principal_payments_mn: 'leasePrincipal',
+  common_dividends_mn: 'commonDividends',
   preferred_dividends_mn: 'preferredDividends', nwc_current_mn: 'nwcCurrent',
   nwc_prior_mn: 'nwcPrior', lt_operating_assets_current_mn: 'ltOperatingAssetsCurrent',
   lt_operating_assets_prior_mn: 'ltOperatingAssetsPrior',
@@ -397,15 +402,21 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
           <Section title="Income Statement (000s)" id="income">
             <Table rows={[
-              ['revenue','Revenue'],['ebit','EBIT'],['depreciation','Depreciation'],
-              ['amortization','Amortization'],['interestExpense','Interest Exp'],
+              ['revenue','Revenue'],['ebit','EBIT'],
+              ['depreciation','Depreciation (Total)'],
+              ['depreciationPpe','  ↳ PPE Only'],['depreciationRou','  ↳ ROU (Lease)'],
+              ['amortization','Amortization'],
+              ['interestExpense','Interest (Total)'],
+              ['interestDebt','  ↳ Debt Only'],['interestLease','  ↳ Lease Only'],
               ['cashInterestPaid','Cash Int Paid'],['cashTaxesPaid','Cash Tax Paid'],
             ]} />
           </Section>
 
           <Section title="Cash Flow (000s)" id="cashflow">
             <Table rows={[
-              ['cfo','Operating CF'],['capex','Capex'],['commonDividends','Dividends'],
+              ['cfo','Operating CF'],['capex','Capex'],
+              ['leasePrincipal','Lease Payments'],
+              ['commonDividends','Dividends'],
               ['preferredDividends','Pref Dividends'],['minorityDividends','Min Dividends'],
               ['sharebuybacks','Buybacks'],
             ]} />
@@ -415,8 +426,11 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
         <Section title="Balance Sheet (000s)" id="balance">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4">
             <Table rows={[
-              ['totalDebt','Total Debt'],['stDebt','ST Debt'],['cpltd','CPLTD'],
-              ['ltDebt','LT Debt'],['capitalLeases','Capital Leases'],
+              ['totalDebt','Borrowings (ex Lease)'],['stDebt','ST Debt'],['cpltd','CPLTD'],
+              ['ltDebt','LT Debt'],
+              ['leaseTotal','Lease Liabilities (Total)'],
+              ['leaseCurrent','  ↳ Current'],['leaseNoncurrent','  ↳ Non-current'],
+              ['rouAssets','ROU Assets'],
               ['cash','Cash'],['cashLikeAssets','Cash-like'],
               ['totalEquity','Equity'],['minorityInterest','Minority Int'],
               ['deferredTaxes','Deferred Tax'],
