@@ -19,7 +19,7 @@ from fastapi import APIRouter, File, UploadFile, HTTPException
 from pydantic import BaseModel
 
 from extraction.pdf_extractor import extract_text_from_pdf, extract_tables_from_pdf
-from extraction.financial_mapper import map_financials_with_ai, map_financials_heuristic
+from extraction.financial_mapper import map_financials_with_ai, map_financials_heuristic, validate_and_fix_extraction
 from extraction.sector_classifier import classify_sector_with_ai, classify_sector_heuristic
 
 router = APIRouter()
@@ -349,6 +349,48 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
             except Exception as e:
                 warnings.append(f"Invalid sector result: {str(e)[:60]}")
                 logger.warning(f"[{request_id}] Invalid sector result: {e}")
+
+        # ── Step 4.5: Validate + auto-fix extraction ─────────────────────
+        try:
+            t0_val = time.monotonic()
+            extraction_result = validate_and_fix_extraction(
+                extraction_result,
+                raw_text=raw_text,
+                tables=tables,
+                enable_ai_fix=True,
+            )
+            timing["validation"] = time.monotonic() - t0_val
+
+            validation = extraction_result.get("validation", {})
+            n_errors = len(validation.get("errors", []))
+            n_warnings = len(validation.get("warnings", []))
+            n_corrections = len(validation.get("corrections", {}))
+
+            if n_corrections > 0:
+                corrections_detail = "; ".join(
+                    f"{k}: {v['old']}→{v['new']}"
+                    for k, v in validation.get("corrections", {}).items()
+                )
+                warnings.append(f"Auto-corrected {n_corrections} field(s): {corrections_detail}")
+
+            post_errors = validation.get("post_fix_errors", validation.get("errors", []))
+            if post_errors:
+                for issue in post_errors:
+                    warnings.append(
+                        f"Validation {issue['severity']}: {issue['check']} "
+                        f"(off by {issue.get('pct_off', '?')}%)"
+                    )
+
+            if n_errors == 0 and n_warnings == 0:
+                logger.info(f"[{request_id}] All validation checks passed")
+            else:
+                logger.info(
+                    f"[{request_id}] Validation: {n_errors} errors, {n_warnings} warnings, "
+                    f"{n_corrections} auto-corrections"
+                )
+        except Exception as e:
+            warnings.append(f"Validation step failed: {str(e)[:80]}")
+            logger.warning(f"[{request_id}] Validation failed: {e}")
 
         # ── Step 5: Build response ───────────────────────────────────────
         extracted_fields = extraction_result.get("fields", {})

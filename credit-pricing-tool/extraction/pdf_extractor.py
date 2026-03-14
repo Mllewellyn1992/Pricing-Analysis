@@ -537,6 +537,77 @@ def _extract_text_with_pdfplumber(pdf_path: str) -> str:
     return "\n".join(text_parts)
 
 
+def _find_financial_page_range(pdf_path: str) -> tuple:
+    """Quick scan to find which pages contain financial statements.
+
+    Uses PyPDF2 (faster than pdfplumber) for a quick keyword scan.
+    Returns (start_page_0idx, end_page_0idx) — the range to process.
+    Falls back to (0, min(25, total)) if nothing found or PDF is small.
+    """
+    _FS_KEYWORDS = [
+        "statement of comprehensive income", "income statement", "profit or loss",
+        "profit and loss", "statement of financial position", "balance sheet",
+        "statement of cash flows", "cash flow statement", "statement of changes in equity",
+        "total assets", "total equity", "total liabilities",
+        "operating revenue", "net earnings", "earnings before",
+        "cash flows from operating", "dividends paid",
+    ]
+
+    try:
+        # Use PyPDF2 for fast text extraction (much faster than pdfplumber for scanning)
+        try:
+            from PyPDF2 import PdfReader
+        except ImportError:
+            try:
+                import pdfplumber
+                with pdfplumber.open(pdf_path) as pdf:
+                    total_pages = len(pdf.pages)
+                return (0, min(25, total_pages))
+            except Exception:
+                return (0, 25)
+
+        reader = PdfReader(pdf_path)
+        total_pages = len(reader.pages)
+
+        # Small PDFs — just process everything
+        if total_pages <= 20:
+            return (0, total_pages)
+
+        # Fast scan with PyPDF2
+        first_fs_page = None
+        last_fs_page = None
+
+        for i in range(total_pages):
+            try:
+                text = (reader.pages[i].extract_text() or "").lower()[:500]
+            except Exception:
+                continue
+
+            has_keyword = any(kw in text for kw in _FS_KEYWORDS)
+            if has_keyword:
+                if first_fs_page is None:
+                    first_fs_page = i
+                last_fs_page = i
+
+        if first_fs_page is not None:
+            # Add 2 pages context before, 3 after
+            start = max(0, first_fs_page - 2)
+            end = min(total_pages, last_fs_page + 4)
+            logger.info(
+                f"Financial statements found on pages {first_fs_page+1}-{last_fs_page+1}, "
+                f"processing pages {start+1}-{end} of {total_pages}"
+            )
+            return (start, end)
+
+        # Fallback: first 25 pages
+        logger.info(f"No financial statement markers found, processing first 25 of {total_pages} pages")
+        return (0, min(25, total_pages))
+
+    except Exception as e:
+        logger.warning(f"Financial page scan failed: {e}, processing first 25 pages")
+        return (0, 25)
+
+
 def _extract_text_hybrid(pdf_path: str, dpi: int = _DEFAULT_DPI) -> str:
     """Smart per-page hybrid extraction: pdfplumber + targeted OCR.
 
@@ -547,10 +618,15 @@ def _extract_text_hybrid(pdf_path: str, dpi: int = _DEFAULT_DPI) -> str:
     4. Otherwise keep pdfplumber text (faster, higher quality for clean PDFs)
 
     Memory-conscious: limits OCR pages, uses lower DPI, garbage collects.
+    For large PDFs (>20 pages), first identifies which pages contain financial
+    statements and only processes those pages.
     """
     import pdfplumber
 
     has_ocr = _has_library("pytesseract") and _has_library("pdf2image")
+
+    # Smart page targeting for large PDFs
+    fs_start, fs_end = _find_financial_page_range(pdf_path)
 
     text_parts = []
     ocr_pages = 0
@@ -561,12 +637,15 @@ def _extract_text_hybrid(pdf_path: str, dpi: int = _DEFAULT_DPI) -> str:
         total_pages = len(pdf.pages)
         logger.info(f"Hybrid extraction: {total_pages} pages, OCR available: {has_ocr}")
 
-        # Cap total pages to prevent OOM on massive PDFs
-        pages_to_process = min(total_pages, _MAX_PDF_PAGES)
-        if pages_to_process < total_pages:
-            logger.warning(f"PDF has {total_pages} pages, limiting to {pages_to_process}")
+        # Apply smart page range
+        start_page = max(0, fs_start)
+        end_page = min(total_pages, fs_end, _MAX_PDF_PAGES)
+        pages_to_process = end_page - start_page
 
-        for i in range(pages_to_process):
+        if pages_to_process < total_pages:
+            logger.info(f"Processing pages {start_page+1}-{end_page} ({pages_to_process} of {total_pages} pages)")
+
+        for i in range(start_page, end_page):
             page = pdf.pages[i]
             page_num = i + 1  # 1-indexed for pdf2image
 
@@ -592,8 +671,13 @@ def _extract_text_hybrid(pdf_path: str, dpi: int = _DEFAULT_DPI) -> str:
                     if text.strip():
                         text_parts.append(text)
             elif _page_is_multicolumn(text):
-                if has_ocr and _page_has_financial_statements(text) and (ocr_pages + column_ocr_pages) < _MAX_OCR_PAGES:
-                    logger.debug(f"Page {page_num}: multi-column financial statement, using column OCR")
+                # Only use column OCR if pdfplumber text looks poor quality
+                # (few numbers = columns got merged/scrambled)
+                number_count = len(re.findall(r'\d{3,}', text))
+                text_quality_ok = number_count >= 5 and len(text.strip()) > 200
+
+                if not text_quality_ok and has_ocr and _page_has_financial_statements(text) and (ocr_pages + column_ocr_pages) < _MAX_OCR_PAGES:
+                    logger.debug(f"Page {page_num}: multi-column with poor text quality ({number_count} numbers), using column OCR")
                     col_text = _ocr_page_columns(pdf_path, page_num, dpi)
                     if col_text and col_text.strip():
                         text_parts.append(col_text)
@@ -602,6 +686,7 @@ def _extract_text_hybrid(pdf_path: str, dpi: int = _DEFAULT_DPI) -> str:
                         text_parts.append(text)
                         pdfplumber_pages += 1
                 else:
+                    # pdfplumber text is good enough despite multi-column layout
                     text_parts.append(text)
                     pdfplumber_pages += 1
             else:

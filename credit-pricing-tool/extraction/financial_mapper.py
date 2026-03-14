@@ -417,6 +417,284 @@ def map_financials_with_ai(
         return map_financials_heuristic(raw_text, tables)
 
 
+def _arithmetic_validation(fields: dict) -> list:
+    """Run zero-cost arithmetic cross-checks on extracted fields.
+
+    Returns a list of dicts: {check, expected, actual, diff, severity, field_hint}
+    where severity is 'warning' (>5% off) or 'error' (>15% off).
+    """
+    issues = []
+
+    def _get(name):
+        return fields.get(name)
+
+    def _check(check_name, expected, actual, tolerance_pct, field_hint):
+        if expected is None or actual is None:
+            return
+        if expected == 0 and actual == 0:
+            return
+        diff = abs(expected - actual)
+        base = max(abs(expected), abs(actual), 1)
+        pct = (diff / base) * 100
+        if pct > tolerance_pct:
+            severity = "error" if pct > 15 else "warning"
+            issues.append({
+                "check": check_name,
+                "expected": expected,
+                "actual": actual,
+                "diff": round(diff, 1),
+                "pct_off": round(pct, 1),
+                "severity": severity,
+                "field_hint": field_hint,
+            })
+
+    # 1. Total debt = ST debt + LT debt (+ CPLTD if separate)
+    st = _get("st_debt_mn")
+    lt = _get("lt_debt_net_mn")
+    cpltd = _get("cpltd_mn") or 0
+    td = _get("total_debt_mn")
+    if st is not None and lt is not None and td is not None:
+        calc_total = st + lt + cpltd
+        _check("total_debt = st_debt + lt_debt + cpltd", td, calc_total, 5, "total_debt_mn")
+
+    # 2. NWC sanity: NWC_current should roughly = total_assets - lt_assets - (total_assets - equity - debt-ish)
+    # Simpler: if we have assets and equity, total_liabilities = assets - equity
+    assets = _get("assets_current_mn")
+    equity = _get("total_equity_mn")
+    if assets is not None and equity is not None and td is not None:
+        implied_total_liab = assets - equity
+        # implied_total_liab should be >= total_debt (debt is a subset of liabilities)
+        if implied_total_liab > 0 and td > implied_total_liab * 1.05:
+            issues.append({
+                "check": "total_debt should be <= total_liabilities (assets - equity)",
+                "expected": round(implied_total_liab, 1),
+                "actual": td,
+                "diff": round(td - implied_total_liab, 1),
+                "pct_off": round(((td - implied_total_liab) / implied_total_liab) * 100, 1),
+                "severity": "error",
+                "field_hint": "total_debt_mn",
+            })
+
+    # 3. Capex should be positive (or zero), CFO can be either sign
+    capex = _get("capex_mn")
+    if capex is not None and capex < 0:
+        issues.append({
+            "check": "capex should be positive (represents spending)",
+            "expected": abs(capex),
+            "actual": capex,
+            "diff": abs(capex) * 2,
+            "pct_off": 100,
+            "severity": "warning",
+            "field_hint": "capex_mn",
+        })
+
+    # 4. EBIT/EBITDA relationship: EBIT + D&A should ≈ EBITDA
+    ebit = _get("ebit_mn")
+    dep = _get("depreciation_mn") or 0
+    amort = _get("amortization_mn") or 0
+    revenue = _get("revenue_mn")
+
+    # 5. EBIT should be < Revenue in absolute terms
+    if ebit is not None and revenue is not None and revenue != 0:
+        if abs(ebit) > abs(revenue) * 1.5:
+            issues.append({
+                "check": "abs(EBIT) should be <= 1.5x Revenue",
+                "expected": revenue,
+                "actual": ebit,
+                "diff": round(abs(ebit) - abs(revenue), 1),
+                "pct_off": round((abs(ebit) / abs(revenue)) * 100, 1),
+                "severity": "error",
+                "field_hint": "ebit_mn",
+            })
+
+    # 6. Assets current vs prior — shouldn't differ by >200%
+    a_cur = _get("assets_current_mn")
+    a_pri = _get("assets_prior_mn")
+    if a_cur is not None and a_pri is not None and a_pri != 0:
+        ratio = abs(a_cur / a_pri)
+        if ratio > 3.0 or ratio < 0.33:
+            issues.append({
+                "check": "current vs prior total assets shouldn't differ by >200%",
+                "expected": a_pri,
+                "actual": a_cur,
+                "diff": round(abs(a_cur - a_pri), 1),
+                "pct_off": round(abs(ratio - 1) * 100, 1),
+                "severity": "error",
+                "field_hint": "assets_prior_mn",
+            })
+
+    # 7. NWC = current assets - current liabilities (cross-check if we can infer)
+    nwc = _get("nwc_current_mn")
+    lt_assets = _get("lt_operating_assets_current_mn")
+    if nwc is not None and assets is not None and lt_assets is not None and equity is not None:
+        # current_assets = total_assets - lt_operating_assets (approximately)
+        implied_current_assets = assets - lt_assets
+        # current_liabilities = total_assets - equity - non_current_liab
+        # NWC = current_assets - current_liabilities
+        # If we know debt: non_current_liab ≈ lt_debt
+        if lt is not None:
+            implied_current_liab = (assets - equity) - lt
+            implied_nwc = implied_current_assets - implied_current_liab
+            _check("NWC cross-check (assets - lt_assets - current_liab)", nwc, round(implied_nwc, 1), 10, "nwc_current_mn")
+
+    # 8. Cash should be < total assets
+    cash = _get("cash_mn")
+    if cash is not None and assets is not None and cash > assets:
+        issues.append({
+            "check": "cash should be <= total assets",
+            "expected": assets,
+            "actual": cash,
+            "diff": round(cash - assets, 1),
+            "pct_off": round(((cash - assets) / assets) * 100, 1),
+            "severity": "error",
+            "field_hint": "cash_mn",
+        })
+
+    return issues
+
+
+def _build_reextraction_prompt(relevant_text: str, flagged_fields: list, original_values: dict) -> str:
+    """Build a targeted prompt to re-extract only the flagged fields.
+
+    Uses ~500-1000 tokens per call — very cheap.
+    """
+    field_descriptions = {k: v for k, v in FINANCIAL_FIELDS.items()}
+    field_list = []
+    for item in flagged_fields:
+        fname = item["field_hint"]
+        desc = field_descriptions.get(fname, fname)
+        field_list.append(
+            f"- {fname} ({desc}): originally extracted as {original_values.get(fname, 'N/A')}, "
+            f"flagged because: {item['check']} (off by {item.get('pct_off', '?')}%)"
+        )
+
+    return f"""You are a financial data extraction expert. A previous extraction pass had validation errors on specific fields. Re-extract ONLY the flagged fields below, being extra careful.
+
+DOCUMENT TEXT:
+{relevant_text}
+
+FLAGGED FIELDS TO RE-EXTRACT:
+{chr(10).join(field_list)}
+
+IMPORTANT:
+- Report ALL values in THOUSANDS (000s)
+- Check the document's reporting unit ($000, whole dollars, millions, etc.)
+- Double-check your arithmetic carefully
+- If you see the same value as before and are confident, keep it
+- If the number was clearly misread (OCR artifact), try to correct it
+
+Return ONLY a JSON object:
+{{
+  "fields": {{"field_name": corrected_value_in_thousands, ...}},
+  "confidence": {{"field_name": 0.0_to_1.0, ...}},
+  "corrections": {{"field_name": "brief explanation of what changed"}}
+}}"""
+
+
+def validate_and_fix_extraction(
+    extraction_result: dict,
+    raw_text: str,
+    tables: list,
+    api_key: str = None,
+    enable_ai_fix: bool = True,
+) -> dict:
+    """Run arithmetic validation on extraction, optionally re-extract flagged fields with AI.
+
+    Step 1: Pure arithmetic checks (zero tokens)
+    Step 2: If errors found and enable_ai_fix=True, targeted AI re-extraction (~500-1000 tokens)
+
+    Args:
+        extraction_result: Output from map_financials_with_ai()
+        raw_text: The original PDF text
+        tables: The original extracted tables
+        api_key: Anthropic API key (for AI fix step)
+        enable_ai_fix: Whether to spend tokens on re-extraction
+
+    Returns:
+        Updated extraction_result with added 'validation' key
+    """
+    fields = extraction_result.get("fields", {})
+    confidence = extraction_result.get("confidence", {})
+
+    # Step 1: Arithmetic validation (free)
+    issues = _arithmetic_validation(fields)
+
+    validation = {
+        "checks_run": True,
+        "issues": issues,
+        "errors": [i for i in issues if i["severity"] == "error"],
+        "warnings": [i for i in issues if i["severity"] == "warning"],
+        "ai_reextraction": False,
+        "corrections": {},
+    }
+
+    # Step 2: AI re-extraction of flagged fields (only for errors, not warnings)
+    error_items = validation["errors"]
+    if error_items and enable_ai_fix:
+        try:
+            import anthropic
+            import os
+
+            api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                logger.warning("No API key for re-extraction fix")
+                extraction_result["validation"] = validation
+                return extraction_result
+
+            client = anthropic.Anthropic(api_key=api_key)
+            relevant_text = _extract_relevant_sections(raw_text, max_chars=15000)
+            prompt = _build_reextraction_prompt(relevant_text, error_items, fields)
+
+            logger.info(f"Running targeted AI re-extraction for {len(error_items)} flagged fields")
+            response_text = _call_claude_with_retry(
+                client,
+                model="claude-sonnet-4-6",
+                max_tokens=1024,
+                prompt=prompt,
+                max_retries=1,
+            )
+
+            fix_result = _extract_json_from_response(response_text)
+            fix_fields = fix_result.get("fields", {})
+            fix_confidence = fix_result.get("confidence", {})
+            corrections = fix_result.get("corrections", {})
+
+            # Apply corrections where the AI is more confident
+            for fname, new_val in fix_fields.items():
+                if new_val is None:
+                    continue
+                old_val = fields.get(fname)
+                new_conf = fix_confidence.get(fname, 0.5)
+                old_conf = confidence.get(fname, 0.5)
+
+                if new_conf >= old_conf or new_val != old_val:
+                    fields[fname] = new_val
+                    confidence[fname] = new_conf
+                    correction_note = corrections.get(fname, "re-extracted")
+                    validation["corrections"][fname] = {
+                        "old": old_val,
+                        "new": new_val,
+                        "reason": correction_note,
+                    }
+                    logger.info(f"Corrected {fname}: {old_val} → {new_val} ({correction_note})")
+
+            validation["ai_reextraction"] = True
+
+            # Re-run validation after corrections
+            post_fix_issues = _arithmetic_validation(fields)
+            validation["post_fix_issues"] = post_fix_issues
+            validation["post_fix_errors"] = [i for i in post_fix_issues if i["severity"] == "error"]
+
+        except Exception as e:
+            logger.warning(f"AI re-extraction failed: {e}")
+            validation["ai_reextraction_error"] = str(e)
+
+    extraction_result["fields"] = fields
+    extraction_result["confidence"] = confidence
+    extraction_result["validation"] = validation
+    return extraction_result
+
+
 def map_financials_heuristic(
     raw_text: str,
     tables: List[Dict[str, Any]],
