@@ -23,23 +23,35 @@ logger = logging.getLogger(__name__)
 FINANCIAL_FIELDS = {
     "revenue_mn": "Total revenue or net sales (thousands)",
     "ebit_mn": "EBIT or operating income (thousands)",
-    "depreciation_mn": "Depreciation (thousands)",
-    "amortization_mn": "Amortization (thousands)",
-    "interest_expense_mn": "Interest expense (thousands)",
+    # ── IFRS-16 lease breakdown: depreciation ──
+    "depreciation_mn": "TOTAL depreciation incl. ROU assets (thousands) — must equal depreciation_ppe_mn + depreciation_rou_mn",
+    "depreciation_ppe_mn": "Depreciation of property, plant & equipment ONLY, excluding right-of-use assets (thousands)",
+    "depreciation_rou_mn": "Depreciation/amortisation of right-of-use (ROU) lease assets ONLY (thousands)",
+    "amortization_mn": "Amortization of intangibles (thousands)",
+    # ── IFRS-16 lease breakdown: interest ──
+    "interest_expense_mn": "TOTAL interest expense incl. lease interest (thousands) — must equal interest_debt_mn + interest_lease_mn",
+    "interest_debt_mn": "Interest on borrowings/bank debt ONLY, excluding lease interest (thousands)",
+    "interest_lease_mn": "Interest on lease liabilities ONLY (thousands)",
     "cash_interest_paid_mn": "Cash interest paid (thousands)",
     "cash_taxes_paid_mn": "Cash taxes paid (thousands)",
-    "total_debt_mn": "Total debt (thousands)",
+    # ── IFRS-16 lease breakdown: balance sheet ──
+    "total_debt_mn": "Total borrowings/bank debt excluding lease liabilities (thousands)",
     "st_debt_mn": "Short-term debt (thousands)",
     "cpltd_mn": "Current portion of long-term debt (thousands)",
     "lt_debt_net_mn": "Long-term debt net (thousands)",
-    "capital_leases_mn": "Capital leases (thousands)",
+    "lease_liabilities_mn": "TOTAL lease liabilities (current + non-current) under IFRS-16 (thousands)",
+    "lease_liabilities_current_mn": "Current portion of lease liabilities (thousands)",
+    "lease_liabilities_noncurrent_mn": "Non-current portion of lease liabilities (thousands)",
+    "rou_assets_mn": "Right-of-use assets on balance sheet (thousands)",
     "cash_mn": "Cash and equivalents (thousands)",
     "cash_like_mn": "Cash-like securities (thousands)",
     "total_equity_mn": "Total equity (thousands)",
     "minority_interest_mn": "Minority interest (thousands)",
     "deferred_taxes_mn": "Deferred taxes (thousands)",
+    # ── IFRS-16 lease breakdown: cash flow ──
     "cfo_mn": "Cash flow from operations (thousands)",
     "capex_mn": "Capital expenditures (thousands)",
+    "lease_principal_payments_mn": "Principal portion of lease payments in financing activities (thousands)",
     "common_dividends_mn": "Common dividends paid (thousands)",
     "preferred_dividends_mn": "Preferred dividends paid (thousands)",
     "nwc_current_mn": "Net working capital - current period (thousands)",
@@ -75,6 +87,10 @@ _PRIMARY_MARKERS = [
     "borrowings",
     "segment information",
     "operating performance",
+    "right-of-use",
+    "lease liabilities",
+    "depreciation and amortisation",
+    "depreciation and amortization",
 ]
 
 _SECONDARY_MARKERS = [
@@ -295,18 +311,49 @@ WHERE TO FIND EACH FIELD
 - revenue_mn: Look for "Revenue", "Retail sales", "Net sales", "Sales" in the INCOME STATEMENT
   (NOT in narrative summaries or "at a glance" sections)
 - ebit_mn: "Operating profit", "Earnings before interest and tax", "EBIT" in INCOME STATEMENT
-- depreciation_mn: "Depreciation" or "Depreciation and amortisation" in INCOME STATEMENT or notes
-- interest_expense_mn: "Interest expense", "Interest on leases" + "Other net interest",
-  "Finance costs" in INCOME STATEMENT (NOT "Other income")
 - cfo_mn: "Net cash flows from operating activities" in CASH FLOW STATEMENT
 - capex_mn: "Purchase of property, plant and equipment" or "Capital expenditure" in CASH FLOW STATEMENT
   (report as POSITIVE number even if shown as negative in the statement)
 - cash_mn: "Cash and cash equivalents" in BALANCE SHEET
 - total_equity_mn: "Total equity" in BALANCE SHEET
 - total_debt_mn: "Borrowings" or total of short-term + long-term debt in BALANCE SHEET
+  (EXCLUDE lease liabilities — those go in lease_liabilities_mn)
 - assets_current_mn: "Total assets" for CURRENT YEAR in BALANCE SHEET
 - assets_prior_mn: "Total assets" for PRIOR YEAR in BALANCE SHEET
 - common_dividends_mn: "Dividends paid" in CASH FLOW STATEMENT or dividend notes
+
+═══════════════════════════════════════════════════════════
+IFRS-16 LEASE BREAKDOWN — CRITICAL
+═══════════════════════════════════════════════════════════
+Most NZ companies report under IFRS-16, which capitalises leases onto the balance sheet.
+You MUST break out lease vs non-lease components for cross-validation:
+
+DEPRECIATION (Income Statement or Notes):
+- depreciation_mn: TOTAL depreciation = PPE depreciation + ROU asset depreciation
+- depreciation_ppe_mn: Depreciation of property, plant & equipment ONLY
+- depreciation_rou_mn: Depreciation of right-of-use (ROU) assets ONLY
+  Look for "Depreciation of right-of-use assets", "ROU depreciation", or in the notes
+  breaking down depreciation by asset class. Often in the same note as total D&A.
+  RULE: depreciation_mn MUST = depreciation_ppe_mn + depreciation_rou_mn
+
+INTEREST (Income Statement):
+- interest_expense_mn: TOTAL interest = debt interest + lease interest
+- interest_debt_mn: Interest on borrowings/bank debt ONLY
+  Look for "Interest on borrowings", "Other net interest", "Finance costs" excluding leases
+- interest_lease_mn: Interest on lease liabilities ONLY
+  Look for "Interest on lease liabilities", "Lease interest", "Interest on leases"
+  RULE: interest_expense_mn MUST = interest_debt_mn + interest_lease_mn
+
+BALANCE SHEET — LEASES:
+- lease_liabilities_mn: TOTAL lease liabilities (current + non-current)
+- lease_liabilities_current_mn: Current portion of lease liabilities
+- lease_liabilities_noncurrent_mn: Non-current portion of lease liabilities
+- rou_assets_mn: Right-of-use assets (often shown separately or in PPE notes)
+  RULE: lease_liabilities_mn = lease_liabilities_current_mn + lease_liabilities_noncurrent_mn
+
+CASH FLOW — LEASES:
+- lease_principal_payments_mn: Principal portion of lease payments (financing activities)
+  Look for "Payment of lease liabilities", "Lease payments - principal"
 
 FIELDS TO EXTRACT:
 {fields_str}
@@ -342,7 +389,9 @@ RULES:
 4. Use null (not 0) for missing fields
 5. Extract from the FORMAL FINANCIAL STATEMENTS, not from narrative summaries, "at a glance" pages, or management commentary
 6. Capex should be a POSITIVE number (it represents cash spent)
-7. Interest expense: include BOTH lease interest and other interest if available
+7. Break out IFRS-16 lease components wherever possible — see the IFRS-16 section above
+8. depreciation_mn MUST be the TOTAL (PPE + ROU), NOT just one component
+9. interest_expense_mn MUST be the TOTAL (debt + lease), NOT just one component
 """
 
 
@@ -367,6 +416,99 @@ def _validate_and_clean_response(result: dict) -> tuple:
             logger.warning(f"{field} value {value} seems too large for thousands")
 
     return fields, confidence, errors
+
+
+def _compute_ifrs16_totals(fields: dict, confidence: dict) -> list:
+    """Compute IFRS-16 totals from components and vice-versa.
+
+    If the AI extracted components but not the total, sum them up.
+    If it extracted a total but not the components, leave components as-is (unknown).
+
+    Returns a list of computation notes for logging.
+    """
+    notes = []
+
+    def _get(name):
+        return fields.get(name)
+
+    def _set(name, value, conf, note):
+        fields[name] = value
+        confidence[name] = conf
+        notes.append(note)
+
+    # ── Depreciation: total = PPE + ROU ──
+    dep_total = _get("depreciation_mn")
+    dep_ppe = _get("depreciation_ppe_mn")
+    dep_rou = _get("depreciation_rou_mn")
+
+    if dep_ppe is not None and dep_rou is not None and dep_total is None:
+        _set("depreciation_mn", dep_ppe + dep_rou,
+             min(confidence.get("depreciation_ppe_mn", 0.8), confidence.get("depreciation_rou_mn", 0.8)),
+             f"Computed depreciation_mn = {dep_ppe} + {dep_rou} = {dep_ppe + dep_rou}")
+    elif dep_total is not None and dep_ppe is not None and dep_rou is None:
+        computed_rou = dep_total - dep_ppe
+        if computed_rou >= 0:
+            _set("depreciation_rou_mn", computed_rou,
+                 min(confidence.get("depreciation_mn", 0.8), confidence.get("depreciation_ppe_mn", 0.8)),
+                 f"Computed depreciation_rou_mn = {dep_total} - {dep_ppe} = {computed_rou}")
+    elif dep_total is not None and dep_rou is not None and dep_ppe is None:
+        computed_ppe = dep_total - dep_rou
+        if computed_ppe >= 0:
+            _set("depreciation_ppe_mn", computed_ppe,
+                 min(confidence.get("depreciation_mn", 0.8), confidence.get("depreciation_rou_mn", 0.8)),
+                 f"Computed depreciation_ppe_mn = {dep_total} - {dep_rou} = {computed_ppe}")
+
+    # ── Interest: total = debt + lease ──
+    int_total = _get("interest_expense_mn")
+    int_debt = _get("interest_debt_mn")
+    int_lease = _get("interest_lease_mn")
+
+    if int_debt is not None and int_lease is not None and int_total is None:
+        _set("interest_expense_mn", int_debt + int_lease,
+             min(confidence.get("interest_debt_mn", 0.8), confidence.get("interest_lease_mn", 0.8)),
+             f"Computed interest_expense_mn = {int_debt} + {int_lease} = {int_debt + int_lease}")
+    elif int_total is not None and int_debt is not None and int_lease is None:
+        computed_lease = int_total - int_debt
+        if computed_lease >= 0:
+            _set("interest_lease_mn", computed_lease,
+                 min(confidence.get("interest_expense_mn", 0.8), confidence.get("interest_debt_mn", 0.8)),
+                 f"Computed interest_lease_mn = {int_total} - {int_debt} = {computed_lease}")
+    elif int_total is not None and int_lease is not None and int_debt is None:
+        computed_debt = int_total - int_lease
+        if computed_debt >= 0:
+            _set("interest_debt_mn", computed_debt,
+                 min(confidence.get("interest_expense_mn", 0.8), confidence.get("interest_lease_mn", 0.8)),
+                 f"Computed interest_debt_mn = {int_total} - {int_lease} = {computed_debt}")
+
+    # ── Lease liabilities: total = current + non-current ──
+    ll_total = _get("lease_liabilities_mn")
+    ll_cur = _get("lease_liabilities_current_mn")
+    ll_nc = _get("lease_liabilities_noncurrent_mn")
+
+    if ll_cur is not None and ll_nc is not None and ll_total is None:
+        _set("lease_liabilities_mn", ll_cur + ll_nc,
+             min(confidence.get("lease_liabilities_current_mn", 0.8), confidence.get("lease_liabilities_noncurrent_mn", 0.8)),
+             f"Computed lease_liabilities_mn = {ll_cur} + {ll_nc} = {ll_cur + ll_nc}")
+    elif ll_total is not None and ll_cur is not None and ll_nc is None:
+        computed_nc = ll_total - ll_cur
+        if computed_nc >= 0:
+            _set("lease_liabilities_noncurrent_mn", computed_nc,
+                 min(confidence.get("lease_liabilities_mn", 0.8), confidence.get("lease_liabilities_current_mn", 0.8)),
+                 f"Computed lease_liabilities_noncurrent_mn = {ll_total} - {ll_cur} = {computed_nc}")
+    elif ll_total is not None and ll_nc is not None and ll_cur is None:
+        computed_cur = ll_total - ll_nc
+        if computed_cur >= 0:
+            _set("lease_liabilities_current_mn", computed_cur,
+                 min(confidence.get("lease_liabilities_mn", 0.8), confidence.get("lease_liabilities_noncurrent_mn", 0.8)),
+                 f"Computed lease_liabilities_current_mn = {ll_total} - {ll_nc} = {computed_cur}")
+
+    # ── Backward compat: map old capital_leases_mn to lease_liabilities_mn ──
+    if _get("capital_leases_mn") is not None and _get("lease_liabilities_mn") is None:
+        _set("lease_liabilities_mn", fields["capital_leases_mn"],
+             confidence.get("capital_leases_mn", 0.8),
+             f"Mapped capital_leases_mn → lease_liabilities_mn = {fields['capital_leases_mn']}")
+
+    return notes
 
 
 def _extract_json_from_response(response_text: str) -> dict:
@@ -470,8 +612,9 @@ def map_financials_with_ai(
     _CORE_FIELDS = {
         "revenue_mn", "ebit_mn", "depreciation_mn", "cash_mn",
         "total_equity_mn", "cfo_mn", "capex_mn", "assets_current_mn",
+        "interest_expense_mn", "lease_liabilities_mn",
     }
-    _MIN_FIELDS_THRESHOLD = 8  # Retry if fewer than this many fields extracted
+    _MIN_FIELDS_THRESHOLD = 10  # Retry if fewer than this many fields extracted
 
     table_text = _build_table_text(tables)
     relevant_text = _extract_relevant_sections(raw_text, max_chars=35000)
@@ -489,6 +632,11 @@ def map_financials_with_ai(
 
         result = _extract_json_from_response(response_text)
         fields, confidence, errors = _validate_and_clean_response(result)
+
+        # ── Compute IFRS-16 totals from components (or back-fill components from totals) ──
+        ifrs16_notes = _compute_ifrs16_totals(fields, confidence)
+        if ifrs16_notes:
+            logger.info(f"IFRS-16 computed fields: {'; '.join(ifrs16_notes)}")
 
         # ── Field completeness check: retry with expanded context if too few fields ──
         extracted_core = set(fields.keys()) & _CORE_FIELDS
@@ -510,6 +658,9 @@ def map_financials_with_ai(
                 )
                 retry_result = _extract_json_from_response(retry_response)
                 retry_fields, retry_confidence, retry_errors = _validate_and_clean_response(retry_result)
+
+                # Compute IFRS-16 totals for retry result too
+                _compute_ifrs16_totals(retry_fields, retry_confidence)
 
                 # Use retry result if it found more fields
                 if len(retry_fields) > len(fields):
@@ -674,6 +825,80 @@ def _arithmetic_validation(fields: dict) -> list:
             "field_hint": "cash_mn",
         })
 
+    # ═══ IFRS-16 LEASE CROSS-VALIDATION ═══
+
+    # 9. Depreciation completeness: total = PPE + ROU
+    dep_total = _get("depreciation_mn")
+    dep_ppe = _get("depreciation_ppe_mn")
+    dep_rou = _get("depreciation_rou_mn")
+    if dep_total is not None and dep_ppe is not None and dep_rou is not None:
+        calc_dep = dep_ppe + dep_rou
+        _check("depreciation_mn should = depreciation_ppe_mn + depreciation_rou_mn",
+               dep_total, calc_dep, 3, "depreciation_mn")
+
+    # 10. Interest completeness: total = debt + lease
+    int_total = _get("interest_expense_mn")
+    int_debt = _get("interest_debt_mn")
+    int_lease = _get("interest_lease_mn")
+    if int_total is not None and int_debt is not None and int_lease is not None:
+        calc_int = int_debt + int_lease
+        _check("interest_expense_mn should = interest_debt_mn + interest_lease_mn",
+               int_total, calc_int, 3, "interest_expense_mn")
+
+    # 11. Lease consistency: if lease interest > 0, then ROU depreciation should > 0
+    if int_lease is not None and int_lease > 0 and dep_rou is not None and dep_rou == 0:
+        issues.append({
+            "check": "lease interest > 0 but ROU depreciation = 0 (IFRS-16 inconsistency)",
+            "expected": "depreciation_rou_mn > 0",
+            "actual": 0,
+            "diff": 0,
+            "pct_off": 100,
+            "severity": "warning",
+            "field_hint": "depreciation_rou_mn",
+        })
+    if dep_rou is not None and dep_rou > 0 and int_lease is not None and int_lease == 0:
+        issues.append({
+            "check": "ROU depreciation > 0 but lease interest = 0 (IFRS-16 inconsistency)",
+            "expected": "interest_lease_mn > 0",
+            "actual": 0,
+            "diff": 0,
+            "pct_off": 100,
+            "severity": "warning",
+            "field_hint": "interest_lease_mn",
+        })
+
+    # 12. Balance sheet lease consistency: if lease liabilities > 0, then ROU assets > 0
+    ll = _get("lease_liabilities_mn")
+    rou = _get("rou_assets_mn")
+    if ll is not None and ll > 0 and rou is not None and rou == 0:
+        issues.append({
+            "check": "lease liabilities > 0 but ROU assets = 0 (IFRS-16 inconsistency)",
+            "expected": "rou_assets_mn > 0",
+            "actual": 0,
+            "diff": 0,
+            "pct_off": 100,
+            "severity": "warning",
+            "field_hint": "rou_assets_mn",
+        })
+    if rou is not None and rou > 0 and ll is not None and ll == 0:
+        issues.append({
+            "check": "ROU assets > 0 but lease liabilities = 0 (IFRS-16 inconsistency)",
+            "expected": "lease_liabilities_mn > 0",
+            "actual": 0,
+            "diff": 0,
+            "pct_off": 100,
+            "severity": "warning",
+            "field_hint": "lease_liabilities_mn",
+        })
+
+    # 13. Lease liabilities = current + non-current
+    ll_cur = _get("lease_liabilities_current_mn")
+    ll_nc = _get("lease_liabilities_noncurrent_mn")
+    if ll is not None and ll_cur is not None and ll_nc is not None:
+        calc_ll = ll_cur + ll_nc
+        _check("lease_liabilities_mn should = current + non-current",
+               ll, calc_ll, 3, "lease_liabilities_mn")
+
     return issues
 
 
@@ -692,7 +917,7 @@ def _build_reextraction_prompt(relevant_text: str, flagged_fields: list, origina
             f"flagged because: {item['check']} (off by {item.get('pct_off', '?')}%)"
         )
 
-    return f"""You are a financial data extraction expert. A previous extraction pass had validation errors on specific fields. Re-extract ONLY the flagged fields below, being extra careful.
+    return f"""You are a financial data extraction expert specialising in New Zealand IFRS-16 annual reports. A previous extraction pass had validation errors on specific fields. Re-extract ONLY the flagged fields below, being extra careful.
 
 DOCUMENT TEXT:
 {relevant_text}
@@ -706,6 +931,13 @@ IMPORTANT:
 - Double-check your arithmetic carefully
 - If you see the same value as before and are confident, keep it
 - If the number was clearly misread (OCR artifact), try to correct it
+
+IFRS-16 LEASE RULES:
+- depreciation_mn MUST = depreciation_ppe_mn + depreciation_rou_mn
+- interest_expense_mn MUST = interest_debt_mn + interest_lease_mn
+- lease_liabilities_mn MUST = lease_liabilities_current_mn + lease_liabilities_noncurrent_mn
+- If lease interest exists, ROU depreciation must also exist (and vice versa)
+- If lease liabilities exist, ROU assets must also exist (and vice versa)
 
 Return ONLY a JSON object:
 {{
