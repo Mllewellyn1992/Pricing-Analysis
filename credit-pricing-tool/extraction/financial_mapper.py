@@ -196,15 +196,16 @@ def _collect_text_within_budget(raw_text, section_groups, max_chars):
     return parts
 
 
-def _extract_relevant_sections(raw_text: str, max_chars: int = 35000) -> str:
+def _extract_relevant_sections(raw_text: str, max_chars: int = 50000) -> str:
     """Extract the most financially-relevant sections from raw PDF text.
 
     Finds financial statement headers, prioritises sections with numeric data,
     and deduplicates overlapping sections within a character budget.
     Falls back to first max_chars characters if no sections found.
 
-    Budget: 35,000 chars by default — enough for income statement + balance sheet
-    + cash flow + key notes (debt, equity) even when pages are dense.
+    Budget: 50,000 chars by default — enough for income statement + balance sheet
+    + cash flow + key notes (debt, equity, leases, depreciation) even when
+    pages are dense or notes are spread across many pages.
     """
     if len(raw_text) <= max_chars:
         return raw_text
@@ -617,7 +618,7 @@ def map_financials_with_ai(
     _MIN_FIELDS_THRESHOLD = 10  # Retry if fewer than this many fields extracted
 
     table_text = _build_table_text(tables)
-    relevant_text = _extract_relevant_sections(raw_text, max_chars=35000)
+    relevant_text = _extract_relevant_sections(raw_text, max_chars=50000)
     prompt = _build_extraction_prompt(relevant_text, table_text)
 
     try:
@@ -646,7 +647,7 @@ def map_financials_with_ai(
                 f"Retrying with expanded context."
             )
             # Retry with full text (up to 45k chars) to capture anything missed
-            expanded_text = _extract_relevant_sections(raw_text, max_chars=45000)
+            expanded_text = _extract_relevant_sections(raw_text, max_chars=60000)
             if len(expanded_text) > len(relevant_text) + 1000:
                 retry_prompt = _build_extraction_prompt(expanded_text, table_text)
                 retry_response = _call_claude_with_retry(
@@ -998,7 +999,7 @@ def validate_and_fix_extraction(
                 return extraction_result
 
             client = anthropic.Anthropic(api_key=api_key)
-            relevant_text = _extract_relevant_sections(raw_text, max_chars=35000)
+            relevant_text = _extract_relevant_sections(raw_text, max_chars=50000)
             prompt = _build_reextraction_prompt(relevant_text, error_items, fields)
 
             logger.info(f"Running targeted AI re-extraction for {len(error_items)} flagged fields")

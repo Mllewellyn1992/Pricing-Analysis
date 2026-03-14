@@ -238,12 +238,17 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
 
         # ── Step 1.5: Check cache ────────────────────────────────────────
         if file_hash in _extraction_cache:
-            logger.info(f"[{request_id}] Cache HIT for {file_hash[:12]}")
             cached = _extraction_cache[file_hash]
-            cached_response = ExtractionResponse(**cached)
-            cached_response.request_id = request_id
-            cached_response.message = f"Cached result: {cached_response.message}"
-            return cached_response
+            # Only serve cached result if it was an AI extraction (not heuristic fallback)
+            if cached.get("extraction_method") == "ai":
+                logger.info(f"[{request_id}] Cache HIT for {file_hash[:12]}")
+                cached_response = ExtractionResponse(**cached)
+                cached_response.request_id = request_id
+                cached_response.message = f"Cached result: {cached_response.message}"
+                return cached_response
+            else:
+                logger.info(f"[{request_id}] Cache SKIP for {file_hash[:12]} (was heuristic, re-extracting)")
+                del _extraction_cache[file_hash]
 
         # ── Step 2: Text extraction (with timeout) ───────────────────────
         try:
