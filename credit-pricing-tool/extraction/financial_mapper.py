@@ -390,7 +390,7 @@ def map_financials_with_ai(
         logger.debug("Calling Claude API for financial field extraction")
         response_text = _call_claude_with_retry(
             client,
-            model="claude-sonnet-4-6",
+            model="claude-haiku-4-5-20251001",
             max_tokens=2048,
             prompt=prompt,
             max_retries=2,
