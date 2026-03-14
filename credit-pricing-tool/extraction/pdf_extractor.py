@@ -609,20 +609,17 @@ def _find_financial_page_range(pdf_path: str) -> tuple:
 
 
 def _extract_text_hybrid(pdf_path: str, dpi: int = _DEFAULT_DPI) -> str:
-    """Smart per-page hybrid extraction: pdfplumber + targeted OCR.
+    """Smart per-page hybrid extraction: PyPDF2 (fast) → pdfplumber → OCR.
 
     For each page:
-    1. Try pdfplumber text extraction
-    2. If text is garbled (CID fonts) or empty → OCR that page
-    3. If text has multi-column artifacts → OCR with column splitting
-    4. Otherwise keep pdfplumber text (faster, higher quality for clean PDFs)
+    1. Try PyPDF2 first (10x faster than pdfplumber for clean digital PDFs)
+    2. If text is garbled/empty → try pdfplumber
+    3. If still garbled → OCR as last resort
+    4. Multi-column pages only get OCR if text quality is poor
 
-    Memory-conscious: limits OCR pages, uses lower DPI, garbage collects.
     For large PDFs (>20 pages), first identifies which pages contain financial
     statements and only processes those pages.
     """
-    import pdfplumber
-
     has_ocr = _has_library("pytesseract") and _has_library("pdf2image")
 
     # Smart page targeting for large PDFs
@@ -631,76 +628,110 @@ def _extract_text_hybrid(pdf_path: str, dpi: int = _DEFAULT_DPI) -> str:
     text_parts = []
     ocr_pages = 0
     column_ocr_pages = 0
+    fast_pages = 0
     pdfplumber_pages = 0
 
-    with pdfplumber.open(pdf_path) as pdf:
-        total_pages = len(pdf.pages)
-        logger.info(f"Hybrid extraction: {total_pages} pages, OCR available: {has_ocr}")
+    # Phase 1: Fast extraction with PyPDF2
+    try:
+        from PyPDF2 import PdfReader
+        reader = PdfReader(pdf_path)
+        total_pages = len(reader.pages)
+    except Exception as e:
+        logger.warning(f"PyPDF2 failed to open PDF: {e}, falling back to pdfplumber-only")
+        reader = None
+        import pdfplumber as _pb
+        with _pb.open(pdf_path) as pdf:
+            total_pages = len(pdf.pages)
 
-        # Apply smart page range
-        start_page = max(0, fs_start)
-        end_page = min(total_pages, fs_end, _MAX_PDF_PAGES)
-        pages_to_process = end_page - start_page
+    logger.info(f"Hybrid extraction: {total_pages} pages, OCR available: {has_ocr}")
 
-        if pages_to_process < total_pages:
-            logger.info(f"Processing pages {start_page+1}-{end_page} ({pages_to_process} of {total_pages} pages)")
+    # Apply smart page range
+    start_page = max(0, fs_start)
+    end_page = min(total_pages, fs_end, _MAX_PDF_PAGES)
+    pages_to_process = end_page - start_page
 
-        for i in range(start_page, end_page):
-            page = pdf.pages[i]
-            page_num = i + 1  # 1-indexed for pdf2image
+    if pages_to_process < total_pages:
+        logger.info(f"Processing pages {start_page+1}-{end_page} ({pages_to_process} of {total_pages} pages)")
 
+    # Track pages needing fallback
+    needs_fallback = []  # list of (page_index, reason)
+
+    for i in range(start_page, end_page):
+        page_num = i + 1
+
+        # Try PyPDF2 first (fast)
+        text = ""
+        if reader:
             try:
-                text = page.extract_text() or ""
+                text = reader.pages[i].extract_text() or ""
             except Exception as e:
-                logger.warning(f"pdfplumber failed on page {page_num}: {e}")
-                text = ""
+                logger.debug(f"PyPDF2 failed on page {page_num}: {e}")
 
-            # Decision: is this page good enough from pdfplumber?
-            if _page_is_garbled(text):
-                # Page is empty or garbled — needs OCR
-                if has_ocr and (ocr_pages + column_ocr_pages) < _MAX_OCR_PAGES:
-                    logger.debug(f"Page {page_num}: garbled/empty, using OCR")
-                    ocr_text = _ocr_single_page(pdf_path, page_num, dpi)
-                    if ocr_text and ocr_text.strip():
-                        text_parts.append(ocr_text)
-                        ocr_pages += 1
-                    else:
-                        logger.debug(f"Page {page_num}: OCR also returned nothing")
-                else:
-                    # No OCR available or OCR budget exhausted
-                    if text.strip():
+        if _page_is_garbled(text):
+            needs_fallback.append((i, "garbled"))
+        elif _page_is_multicolumn(text):
+            # Check if text quality is sufficient despite multi-column
+            number_count = len(re.findall(r'\d{3,}', text))
+            if number_count >= 5 and len(text.strip()) > 200:
+                text_parts.append(text)
+                fast_pages += 1
+            else:
+                needs_fallback.append((i, "multicolumn_poor"))
+        else:
+            if text.strip():
+                text_parts.append(text)
+                fast_pages += 1
+
+    # Phase 2: pdfplumber fallback for problem pages only
+    if needs_fallback:
+        import pdfplumber
+        logger.info(f"Falling back to pdfplumber/OCR for {len(needs_fallback)} pages")
+
+        with pdfplumber.open(pdf_path) as pdf:
+            for page_idx, reason in needs_fallback:
+                page_num = page_idx + 1
+                try:
+                    text = pdf.pages[page_idx].extract_text() or ""
+                except Exception as e:
+                    logger.warning(f"pdfplumber failed on page {page_num}: {e}")
+                    text = ""
+
+                if _page_is_garbled(text):
+                    # Still garbled — needs OCR
+                    if has_ocr and (ocr_pages + column_ocr_pages) < _MAX_OCR_PAGES:
+                        logger.debug(f"Page {page_num}: garbled after pdfplumber, using OCR")
+                        ocr_text = _ocr_single_page(pdf_path, page_num, dpi)
+                        if ocr_text and ocr_text.strip():
+                            text_parts.append(ocr_text)
+                            ocr_pages += 1
+                        else:
+                            logger.debug(f"Page {page_num}: OCR also returned nothing")
+                    elif text.strip():
                         text_parts.append(text)
-            elif _page_is_multicolumn(text):
-                # Only use column OCR if pdfplumber text looks poor quality
-                # (few numbers = columns got merged/scrambled)
-                number_count = len(re.findall(r'\d{3,}', text))
-                text_quality_ok = number_count >= 5 and len(text.strip()) > 200
-
-                if not text_quality_ok and has_ocr and _page_has_financial_statements(text) and (ocr_pages + column_ocr_pages) < _MAX_OCR_PAGES:
-                    logger.debug(f"Page {page_num}: multi-column with poor text quality ({number_count} numbers), using column OCR")
-                    col_text = _ocr_page_columns(pdf_path, page_num, dpi)
-                    if col_text and col_text.strip():
-                        text_parts.append(col_text)
-                        column_ocr_pages += 1
+                elif reason == "multicolumn_poor":
+                    # Multi-column with poor PyPDF2 quality — try column OCR
+                    number_count = len(re.findall(r'\d{3,}', text))
+                    if number_count < 5 and has_ocr and _page_has_financial_statements(text) and (ocr_pages + column_ocr_pages) < _MAX_OCR_PAGES:
+                        logger.debug(f"Page {page_num}: multi-column poor quality, using column OCR")
+                        col_text = _ocr_page_columns(pdf_path, page_num, dpi)
+                        if col_text and col_text.strip():
+                            text_parts.append(col_text)
+                            column_ocr_pages += 1
+                        else:
+                            text_parts.append(text)
+                            pdfplumber_pages += 1
                     else:
                         text_parts.append(text)
                         pdfplumber_pages += 1
                 else:
-                    # pdfplumber text is good enough despite multi-column layout
-                    text_parts.append(text)
-                    pdfplumber_pages += 1
-            else:
-                # Page is clean — use pdfplumber text
-                if text.strip():
-                    text_parts.append(text)
-                    pdfplumber_pages += 1
+                    if text.strip():
+                        text_parts.append(text)
+                        pdfplumber_pages += 1
 
-            # Periodic gc for long PDFs
-            if page_num % 20 == 0:
-                gc.collect()
+    gc.collect()
 
     logger.info(
-        f"Hybrid extraction complete: {pdfplumber_pages} pdfplumber, "
+        f"Hybrid extraction complete: {fast_pages} PyPDF2, {pdfplumber_pages} pdfplumber, "
         f"{ocr_pages} OCR, {column_ocr_pages} column-OCR pages"
     )
     return "\n".join(text_parts)
