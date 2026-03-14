@@ -326,13 +326,36 @@ def classify_sector_with_ai(
 
     try:
         logger.debug("Calling Claude API for sector classification")
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=512,
-            messages=[{"role": "user", "content": prompt}]
-        )
 
-        response_text = response.content[0].text
+        # Retry logic with exponential backoff
+        import time as _time
+        max_retries = 2
+        response_text = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = client.messages.create(
+                    model="claude-sonnet-4-6",
+                    max_tokens=512,
+                    timeout=30.0,  # 30 second timeout per API call
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                response_text = response.content[0].text
+                break
+            except Exception as api_err:
+                error_str = str(api_err).lower()
+                is_permanent = any(kw in error_str for kw in [
+                    "invalid_api_key", "authentication", "permission",
+                    "invalid_request", "model_not_found",
+                ])
+                if is_permanent or attempt >= max_retries:
+                    raise
+                wait = 2 ** attempt
+                logger.warning(f"Sector API error (attempt {attempt + 1}), retrying in {wait}s: {api_err}")
+                _time.sleep(wait)
+
+        if not response_text:
+            return classify_sector_heuristic(business_description)
 
         json_str = response_text
         if "```json" in json_str:

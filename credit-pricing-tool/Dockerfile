@@ -49,6 +49,6 @@ ENV PORT=8000
 
 # Run the application
 # --workers 1: single worker to minimize memory footprint
-# --timeout-keep-alive 30: free idle connections sooner
+# --timeout-keep-alive 65: keep connections alive long enough for extraction
 # --limit-max-requests 100: restart worker after 100 requests to prevent memory leaks
-CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT} --workers 1 --timeout-keep-alive 30 --limit-max-requests 100"]
+CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT} --workers 1 --timeout-keep-alive 65 --limit-max-requests 100"]

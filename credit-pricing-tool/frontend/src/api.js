@@ -181,14 +181,14 @@ export async function pingServer() {
  */
 export async function uploadPDF(file, onStatus) {
   const MAX_RETRIES = 2
-  const TIMEOUT_MS = 180000 // 3 minutes — extraction + Claude API can be slow
+  const TIMEOUT_MS = 240000 // 4 minutes — gives backend 3.5min + network buffer
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       if (attempt > 0) {
         onStatus?.('retrying')
-        // Wait before retry (exponential backoff: 3s, 6s)
-        await new Promise(r => setTimeout(r, 3000 * attempt))
+        // Exponential backoff: 4s, 8s (longer to let server recover)
+        await new Promise(r => setTimeout(r, 4000 * attempt))
       }
 
       const formData = new FormData()
@@ -206,7 +206,12 @@ export async function uploadPDF(file, onStatus) {
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}))
-        throw new Error(err.detail || `API error: ${response.statusText}`)
+        const detail = err.detail || `API error: ${response.statusText}`
+        // Don't retry on 4xx client errors (bad file, too large, etc.)
+        if (response.status >= 400 && response.status < 500) {
+          throw Object.assign(new Error(detail), { permanent: true })
+        }
+        throw new Error(detail)
       }
 
       const data = await response.json()
@@ -220,13 +225,20 @@ export async function uploadPDF(file, onStatus) {
         rawTextPreview: data.raw_text_preview || '',
         businessDescription: data.business_description || null,
         sectorClassification: data.sector_classification || null,
+        warnings: data.warnings || [],
+        timing: data.timing || null,
+        requestId: data.request_id || null,
       }
     } catch (error) {
       const isLastAttempt = attempt === MAX_RETRIES
-      const isRetryable = error.name === 'AbortError' ||
+      const isPermanent = error.permanent === true
+      const isRetryable = !isPermanent && (
+        error.name === 'AbortError' ||
         error.message.includes('Failed to fetch') ||
         error.message.includes('NetworkError') ||
-        error.message.includes('API error:')
+        error.message.includes('API error:') ||
+        error.message.includes('500')
+      )
 
       if (isLastAttempt || !isRetryable) {
         console.error('Error uploading PDF:', error)

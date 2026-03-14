@@ -295,6 +295,45 @@ def _extract_json_from_response(response_text: str) -> dict:
     return json.loads(json_str.strip())
 
 
+def _call_claude_with_retry(client, model: str, max_tokens: int, prompt: str, max_retries: int = 2) -> str:
+    """Call Claude API with exponential backoff retry on transient errors.
+
+    Returns the response text on success.
+    Raises on permanent errors or after all retries exhausted.
+    """
+    import time as _time
+
+    for attempt in range(max_retries + 1):
+        try:
+            response = client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                timeout=45.0,  # 45 second timeout per API call
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response.content[0].text
+
+        except Exception as e:
+            error_str = str(e).lower()
+            # Permanent errors — don't retry
+            is_permanent = any(kw in error_str for kw in [
+                "invalid_api_key", "authentication", "permission",
+                "invalid_request", "model_not_found",
+            ])
+            if is_permanent:
+                logger.error(f"Permanent API error (attempt {attempt + 1}): {e}")
+                raise
+
+            # Transient errors — retry with backoff
+            if attempt < max_retries:
+                wait = 2 ** attempt  # 1s, 2s
+                logger.warning(f"Transient API error (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait}s: {e}")
+                _time.sleep(wait)
+            else:
+                logger.error(f"API failed after {max_retries + 1} attempts: {e}")
+                raise
+
+
 def map_financials_with_ai(
     raw_text: str,
     tables: List[Dict[str, Any]],
@@ -305,6 +344,7 @@ def map_financials_with_ai(
 
     Analyzes both raw text and structured table data to identify and extract
     financial fields. Returns confidence scores for each field.
+    Includes retry logic with exponential backoff for transient API errors.
 
     Args:
         raw_text: Extracted text from PDF
@@ -348,13 +388,14 @@ def map_financials_with_ai(
 
     try:
         logger.debug("Calling Claude API for financial field extraction")
-        response = client.messages.create(
+        response_text = _call_claude_with_retry(
+            client,
             model="claude-sonnet-4-6",
             max_tokens=2048,
-            messages=[{"role": "user", "content": prompt}]
+            prompt=prompt,
+            max_retries=2,
         )
 
-        response_text = response.content[0].text
         result = _extract_json_from_response(response_text)
         fields, confidence, errors = _validate_and_clean_response(result)
 
@@ -368,9 +409,6 @@ def map_financials_with_ai(
             "method": "ai",
         }
 
-    except ImportError:
-        logger.warning("anthropic not installed, falling back to heuristic")
-        return map_financials_heuristic(raw_text, tables)
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse Claude response as JSON: {e}")
         return map_financials_heuristic(raw_text, tables)

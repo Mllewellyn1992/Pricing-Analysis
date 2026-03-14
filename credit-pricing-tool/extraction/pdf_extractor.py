@@ -21,6 +21,7 @@ OCR pipeline:
 import os
 import re
 import gc
+import signal
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 
@@ -308,6 +309,37 @@ _MULTICOLUMN_RATIO = 0.25    # If >25% of lines are duplicated headers, likely m
 _DEFAULT_DPI = 150            # Reduced from 300 — still good for OCR, uses ~75% less RAM
 _MAX_OCR_PAGES = 20           # Never OCR more than this many pages (prevent OOM)
 _MAX_PDF_PAGES = 80           # Skip extraction entirely for very large PDFs
+_OCR_PAGE_TIMEOUT = 30        # Max seconds per single page OCR operation
+
+
+class _OCRTimeout(Exception):
+    """Raised when OCR exceeds per-page timeout."""
+    pass
+
+
+def _ocr_with_timeout(func, *args, timeout_sec=_OCR_PAGE_TIMEOUT):
+    """Run an OCR function with a timeout (Unix SIGALRM).
+
+    Falls back to no-timeout execution on Windows or if signal isn't available.
+    """
+    if not hasattr(signal, 'SIGALRM'):
+        # Windows — no SIGALRM support, run without timeout
+        return func(*args)
+
+    def _handler(signum, frame):
+        raise _OCRTimeout(f"OCR operation timed out after {timeout_sec}s")
+
+    old_handler = signal.signal(signal.SIGALRM, _handler)
+    signal.alarm(timeout_sec)
+    try:
+        result = func(*args)
+        signal.alarm(0)  # Cancel alarm
+        return result
+    except _OCRTimeout:
+        raise
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 
 def _page_is_garbled(text: str) -> bool:
@@ -389,92 +421,103 @@ def _page_has_financial_statements(text: str) -> bool:
     return any(kw in text_lower for kw in _FINANCIAL_STATEMENT_KEYWORDS)
 
 
-def _ocr_single_page(pdf_path: str, page_num: int, dpi: int = _DEFAULT_DPI) -> str:
-    """OCR a single page from the PDF. page_num is 1-indexed."""
+def _ocr_single_page_inner(pdf_path: str, page_num: int, dpi: int) -> str:
+    """Inner OCR function for a single page (called with timeout wrapper)."""
     from pdf2image import convert_from_path
     import pytesseract
 
+    images = convert_from_path(
+        pdf_path,
+        dpi=dpi,
+        grayscale=True,
+        thread_count=1,
+        fmt="jpeg",
+        first_page=page_num,
+        last_page=page_num,
+    )
+    if not images:
+        return ""
     try:
-        images = convert_from_path(
-            pdf_path,
-            dpi=dpi,
-            grayscale=True,
-            thread_count=1,
-            fmt="jpeg",
-            first_page=page_num,
-            last_page=page_num,
+        text = pytesseract.image_to_string(
+            images[0], lang="eng", config="--psm 6"
         )
-        if not images:
-            return ""
-        try:
-            text = pytesseract.image_to_string(
-                images[0], lang="eng", config="--psm 6"
-            )
-            return text or ""
-        finally:
-            images[0].close()
-            del images
-            gc.collect()
+        return text or ""
+    finally:
+        images[0].close()
+        del images
+        gc.collect()
+
+
+def _ocr_single_page(pdf_path: str, page_num: int, dpi: int = _DEFAULT_DPI) -> str:
+    """OCR a single page from the PDF with timeout protection. page_num is 1-indexed."""
+    try:
+        return _ocr_with_timeout(_ocr_single_page_inner, pdf_path, page_num, dpi, timeout_sec=_OCR_PAGE_TIMEOUT)
+    except _OCRTimeout:
+        logger.warning(f"OCR timed out on page {page_num} (>{_OCR_PAGE_TIMEOUT}s)")
+        return ""
     except Exception as e:
         logger.warning(f"OCR failed on page {page_num}: {e}")
         return ""
 
 
-def _ocr_page_columns(pdf_path: str, page_num: int, dpi: int = _DEFAULT_DPI) -> str:
-    """OCR a multi-column page by splitting into left and right halves.
-
-    This handles the common NZ annual report layout where two pages of content
-    are rendered side-by-side on a single landscape-oriented page.
-    Each half is OCR'd independently to avoid column merging.
-    """
+def _ocr_page_columns_inner(pdf_path: str, page_num: int, dpi: int) -> str:
+    """Inner column OCR function (called with timeout wrapper)."""
     from pdf2image import convert_from_path
     import pytesseract
-    from PIL import Image
+
+    images = convert_from_path(
+        pdf_path,
+        dpi=dpi,
+        grayscale=True,
+        thread_count=1,
+        fmt="jpeg",
+        first_page=page_num,
+        last_page=page_num,
+    )
+    if not images:
+        return ""
+
+    img = images[0]
+    width, height = img.size
 
     try:
-        images = convert_from_path(
-            pdf_path,
-            dpi=dpi,
-            grayscale=True,
-            thread_count=1,
-            fmt="jpeg",
-            first_page=page_num,
-            last_page=page_num,
+        left_img = img.crop((0, 0, width // 2, height))
+        right_img = img.crop((width // 2, 0, width, height))
+
+        left_text = pytesseract.image_to_string(
+            left_img, lang="eng", config="--psm 6"
         )
-        if not images:
-            return ""
+        right_text = pytesseract.image_to_string(
+            right_img, lang="eng", config="--psm 6"
+        )
 
-        img = images[0]
-        width, height = img.size
+        left_img.close()
+        right_img.close()
 
-        try:
-            # Split into left and right halves
-            left_img = img.crop((0, 0, width // 2, height))
-            right_img = img.crop((width // 2, 0, width, height))
+        parts = []
+        if left_text and left_text.strip():
+            parts.append(left_text.strip())
+        if right_text and right_text.strip():
+            parts.append(right_text.strip())
 
-            left_text = pytesseract.image_to_string(
-                left_img, lang="eng", config="--psm 6"
-            )
-            right_text = pytesseract.image_to_string(
-                right_img, lang="eng", config="--psm 6"
-            )
+        return "\n".join(parts)
+    finally:
+        img.close()
+        del images
+        gc.collect()
 
-            left_img.close()
-            right_img.close()
 
-            # Combine with clear separator
-            parts = []
-            if left_text and left_text.strip():
-                parts.append(left_text.strip())
-            if right_text and right_text.strip():
-                parts.append(right_text.strip())
+def _ocr_page_columns(pdf_path: str, page_num: int, dpi: int = _DEFAULT_DPI) -> str:
+    """OCR a multi-column page with timeout protection.
 
-            return "\n".join(parts)
-        finally:
-            img.close()
-            del images
-            gc.collect()
-
+    Splits page into left and right halves for NZ annual reports
+    with side-by-side layout.
+    """
+    try:
+        return _ocr_with_timeout(_ocr_page_columns_inner, pdf_path, page_num, dpi, timeout_sec=_OCR_PAGE_TIMEOUT * 2)
+    except _OCRTimeout:
+        logger.warning(f"Column OCR timed out on page {page_num}")
+        return ""
     except Exception as e:
         logger.warning(f"Column OCR failed on page {page_num}: {e}")
         return ""

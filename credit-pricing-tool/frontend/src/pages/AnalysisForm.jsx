@@ -95,6 +95,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
   const [uploadError, setUploadError] = useState(null)
   const [uploadFile, setUploadFile] = useState(null)
   const [isDrag, setIsDrag] = useState(false)
+  const [extractionWarnings, setExtractionWarnings] = useState([])
   const fileRef = useRef(null)
 
   useEffect(() => {
@@ -153,6 +154,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
       setUploadStatus('extracting')
       const result = await uploadPDF(file, (status) => setUploadStatus(status))
       applyExtraction(result, file.name)
+      setExtractionWarnings(result.warnings || [])
       setUploadStatus('done')
     } catch (e) { setUploadStatus('error'); setUploadError(e.message) }
   }
@@ -166,7 +168,7 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
 
   const clear = () => {
     setForm({ ...EMPTY_FORM }); setAi({}); setAiConf({}); setSource(null)
-    setUploadStatus(null); setUploadFile(null); setUploadError(null)
+    setUploadStatus(null); setUploadFile(null); setUploadError(null); setExtractionWarnings([])
     onClearExtracted?.()
   }
 
@@ -305,6 +307,16 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
           </div>
         )}
       </div>
+
+      {/* Extraction warnings */}
+      {extractionWarnings.length > 0 && uploadStatus === 'done' && (
+        <div className="mb-2 px-3 py-2 rounded-md border border-amber-200 bg-amber-50/60">
+          <p className="text-[10px] font-semibold text-amber-700 mb-0.5">Extraction notes:</p>
+          {extractionWarnings.map((w, i) => (
+            <p key={i} className="text-[10px] text-amber-600">• {w}</p>
+          ))}
+        </div>
+      )}
 
       {/* Form */}
       <form onSubmit={submit}>
