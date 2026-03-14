@@ -72,26 +72,14 @@ _SECTION_MARKERS = [
 ]
 
 
-def _extract_relevant_sections(raw_text: str, max_chars: int = 20000) -> str:
-    """Extract the most financially-relevant sections from raw PDF text.
+def _find_financial_sections(raw_text: str) -> list:
+    """Scan text for financial statement sections, classifying each as primary or secondary.
 
-    Instead of blindly taking the first N characters (which may be cover pages,
-    auditor reports, etc.), this finds and prioritises financial statement sections.
-
-    Strategy:
-    1. Search for financial statement headers and extract surrounding content
-    2. Skip TOC/index entries (short lines that just list section names)
-    3. Prioritise sections with actual numeric data
-    4. Deduplicate overlapping sections
-    5. If nothing found, fall back to first max_chars characters
+    Returns list of (start, end, marker, is_primary) tuples.
     """
-    if len(raw_text) <= max_chars:
-        return raw_text
-
     text_lower = raw_text.lower()
-
-    # Find positions of financial statement sections
     sections = []
+
     for marker in _SECTION_MARKERS:
         start = 0
         while True:
@@ -99,72 +87,82 @@ def _extract_relevant_sections(raw_text: str, max_chars: int = 20000) -> str:
             if idx == -1:
                 break
 
-            # Skip TOC entries: if the surrounding context (300 chars) has very
-            # few numbers, it's likely just a table of contents line
             context = raw_text[idx:min(len(raw_text), idx + 400)]
             number_count = len(re.findall(r"\d{3,}", context))
 
             if number_count >= 3:
-                # This section has actual financial data
-                section_start = max(0, idx - 100)
-                section_end = min(len(raw_text), idx + 3000)
-                sections.append((section_start, section_end, marker, True))
+                sec_start = max(0, idx - 100)
+                sec_end = min(len(raw_text), idx + 3000)
+                sections.append((sec_start, sec_end, marker, True))
             elif number_count >= 1:
-                # Might have some data, lower priority
-                section_start = max(0, idx - 50)
-                section_end = min(len(raw_text), idx + 1500)
-                sections.append((section_start, section_end, marker, False))
-            # Skip entries with no numbers at all (TOC lines)
+                sec_start = max(0, idx - 50)
+                sec_end = min(len(raw_text), idx + 1500)
+                sections.append((sec_start, sec_end, marker, False))
 
             start = idx + len(marker)
 
-    if not sections:
-        # No financial sections found — fall back to first max_chars
-        return raw_text[:max_chars]
+    return sections
 
-    # Prioritise: sections with actual data first, then secondary sections
-    primary = [(s, e, m) for s, e, m, has_data in sections if has_data]
-    secondary = [(s, e, m) for s, e, m, has_data in sections if not has_data]
 
-    # Sort each group by position and merge overlapping sections
-    def merge_sections(secs):
-        secs.sort(key=lambda x: x[0])
-        merged = []
-        for start, end, marker in secs:
-            if merged and start <= merged[-1][1] + 200:
-                merged[-1] = (merged[-1][0], max(merged[-1][1], end), merged[-1][2])
-            else:
-                merged.append((start, end, marker))
-        return merged
+def _merge_overlapping_sections(secs):
+    """Sort sections by position and merge overlapping ones (within 200 char gap)."""
+    secs.sort(key=lambda x: x[0])
+    merged = []
+    for start, end, marker in secs:
+        if merged and start <= merged[-1][1] + 200:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end), merged[-1][2])
+        else:
+            merged.append((start, end, marker))
+    return merged
 
-    primary_merged = merge_sections(primary)
-    secondary_merged = merge_sections(secondary)
 
-    # Build the relevant text: primary sections first, then secondary if budget allows
+def _collect_text_within_budget(raw_text, section_groups, max_chars):
+    """Collect text chunks from section groups up to max_chars budget.
+
+    Args:
+        section_groups: list of merged section lists, in priority order
+    Returns:
+        list of text chunks
+    """
     parts = []
     total_chars = 0
 
-    for start, end, marker in primary_merged:
-        chunk = raw_text[start:end]
-        if total_chars + len(chunk) > max_chars:
-            remaining = max_chars - total_chars
-            if remaining > 500:
-                parts.append(chunk[:remaining])
-                total_chars += remaining
-            break
-        parts.append(chunk)
-        total_chars += len(chunk)
+    for sections in section_groups:
+        for start, end, _marker in sections:
+            chunk = raw_text[start:end]
+            if total_chars + len(chunk) > max_chars:
+                remaining = max_chars - total_chars
+                if remaining > 500:
+                    parts.append(chunk[:remaining])
+                    total_chars += remaining
+                return parts
+            parts.append(chunk)
+            total_chars += len(chunk)
 
-    # Add secondary sections if we have budget remaining
-    for start, end, marker in secondary_merged:
-        chunk = raw_text[start:end]
-        if total_chars + len(chunk) > max_chars:
-            remaining = max_chars - total_chars
-            if remaining > 500:
-                parts.append(chunk[:remaining])
-            break
-        parts.append(chunk)
-        total_chars += len(chunk)
+    return parts
+
+
+def _extract_relevant_sections(raw_text: str, max_chars: int = 20000) -> str:
+    """Extract the most financially-relevant sections from raw PDF text.
+
+    Finds financial statement headers, prioritises sections with numeric data,
+    and deduplicates overlapping sections within a character budget.
+    Falls back to first max_chars characters if no sections found.
+    """
+    if len(raw_text) <= max_chars:
+        return raw_text
+
+    sections = _find_financial_sections(raw_text)
+    if not sections:
+        return raw_text[:max_chars]
+
+    primary = [(s, e, m) for s, e, m, is_primary in sections if is_primary]
+    secondary = [(s, e, m) for s, e, m, is_primary in sections if not is_primary]
+
+    primary_merged = _merge_overlapping_sections(primary)
+    secondary_merged = _merge_overlapping_sections(secondary)
+
+    parts = _collect_text_within_budget(raw_text, [primary_merged, secondary_merged], max_chars)
 
     result = "\n...\n".join(parts)
     logger.info(
@@ -174,79 +172,30 @@ def _extract_relevant_sections(raw_text: str, max_chars: int = 20000) -> str:
     return result
 
 
-def map_financials_with_ai(
-    raw_text: str,
-    tables: List[Dict[str, Any]],
-    api_key: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Use Claude API to intelligently extract financial fields from documents.
-
-    Analyzes both raw text and structured table data to identify and extract
-    financial fields. Returns confidence scores for each field.
-
-    Args:
-        raw_text: Extracted text from PDF
-        tables: Extracted tables from PDF (list of dicts with columns/rows/caption)
-        api_key: Anthropic API key (uses ANTHROPIC_API_KEY env var if not provided)
-
-    Returns:
-        Dictionary with structure:
-        {
-            "fields": {
-                "revenue_mn": 1234.5,
-                "ebit_mn": 234.5,
-                ...
-            },
-            "confidence": {
-                "revenue_mn": 0.95,
-                "ebit_mn": 0.80,
-                ...
-            },
-            "errors": ["field_name: error reason", ...],
-            "method": "ai"
-        }
-    """
-    try:
-        import anthropic
-    except ImportError:
-        logger.warning("anthropic library not installed; falling back to heuristic")
-        return map_financials_heuristic(raw_text, tables)
-
-    import os
-    api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        logger.warning("ANTHROPIC_API_KEY not set; falling back to heuristic")
-        return map_financials_heuristic(raw_text, tables)
-
-    client = anthropic.Anthropic(api_key=api_key)
-
-    # Build table context
+def _build_table_text(tables: List[Dict[str, Any]]) -> str:
+    """Build formatted table context from extracted tables."""
     table_text = ""
     if tables:
         table_text = "\n\nExtracted Tables:\n"
-        for i, table in enumerate(tables[:5], 1):  # Limit to first 5 tables
+        for i, table in enumerate(tables[:5], 1):
             caption = table.get("caption", f"Table {i}")
             columns = table.get("columns", [])
-            rows = table.get("rows", [])[:10]  # Limit rows
-
+            rows = table.get("rows", [])[:10]
             table_text += f"\n{caption}:\n"
             if columns:
                 table_text += " | ".join(columns) + "\n"
                 table_text += "-" * 60 + "\n"
             for row in rows:
                 table_text += " | ".join(row) + "\n"
+    return table_text
 
-    # Build the extraction prompt — send the most relevant sections, not just the first 8K
+
+def _build_extraction_prompt(relevant_text: str, table_text: str) -> str:
+    """Build the Claude API prompt for financial extraction."""
     fields_str = "\n".join(
         f"- {field}: {desc}" for field, desc in FINANCIAL_FIELDS.items()
     )
-
-    # Extract financial statement sections from the full text
-    # 20K chars ≈ 5K tokens — well within Claude's context window
-    relevant_text = _extract_relevant_sections(raw_text, max_chars=20000)
-
-    prompt = f"""You are a financial data extraction expert. Extract financial data from the following financial statement.
+    return f"""You are a financial data extraction expert. Extract financial data from the following financial statement.
 
 DOCUMENT TEXT:
 {relevant_text}
@@ -312,49 +261,102 @@ CRITICAL RULES:
 6. Pay careful attention to the units used in the document (look for "$000", "in thousands", "$M", etc.)
 """
 
+
+def _validate_and_clean_response(result: dict) -> tuple:
+    """Validate and clean the API response, returning fields, confidence, and errors."""
+    fields = result.get("fields", {})
+    confidence = result.get("confidence", {})
+    fields = {k: v for k, v in fields.items() if v is not None}
+    confidence = {k: v for k, v in confidence.items() if confidence.get(k) is not None}
+
+    errors = []
+    for field, value in list(fields.items()):
+        if not isinstance(value, (int, float)):
+            try:
+                fields[field] = float(value)
+            except (ValueError, TypeError):
+                errors.append(f"{field}: could not convert to number")
+                del fields[field]
+                if field in confidence:
+                    del confidence[field]
+        elif value > 1_000_000_000:
+            logger.warning(f"{field} value {value} seems too large for thousands")
+
+    return fields, confidence, errors
+
+
+def _extract_json_from_response(response_text: str) -> dict:
+    """Parse JSON from Claude response, handling markdown code blocks."""
+    json_str = response_text
+    if "```json" in json_str:
+        json_str = json_str.split("```json")[1].split("```")[0]
+    elif "```" in json_str:
+        json_str = json_str.split("```")[1].split("```")[0]
+    return json.loads(json_str.strip())
+
+
+def map_financials_with_ai(
+    raw_text: str,
+    tables: List[Dict[str, Any]],
+    api_key: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Use Claude API to intelligently extract financial fields from documents.
+
+    Analyzes both raw text and structured table data to identify and extract
+    financial fields. Returns confidence scores for each field.
+
+    Args:
+        raw_text: Extracted text from PDF
+        tables: Extracted tables from PDF (list of dicts with columns/rows/caption)
+        api_key: Anthropic API key (uses ANTHROPIC_API_KEY env var if not provided)
+
+    Returns:
+        Dictionary with structure:
+        {
+            "fields": {
+                "revenue_mn": 1234.5,
+                "ebit_mn": 234.5,
+                ...
+            },
+            "confidence": {
+                "revenue_mn": 0.95,
+                "ebit_mn": 0.80,
+                ...
+            },
+            "errors": ["field_name: error reason", ...],
+            "method": "ai"
+        }
+    """
+    try:
+        import anthropic
+    except ImportError:
+        logger.warning("anthropic library not installed; falling back to heuristic")
+        return map_financials_heuristic(raw_text, tables)
+
+    import os
+    api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        logger.warning("ANTHROPIC_API_KEY not set; falling back to heuristic")
+        return map_financials_heuristic(raw_text, tables)
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    table_text = _build_table_text(tables)
+    relevant_text = _extract_relevant_sections(raw_text, max_chars=20000)
+    prompt = _build_extraction_prompt(relevant_text, table_text)
+
     try:
         logger.debug("Calling Claude API for financial field extraction")
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=2048,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "user", "content": prompt}]
         )
 
         response_text = response.content[0].text
-
-        # Parse JSON response
-        json_str = response_text
-        # Handle potential markdown code block formatting
-        if "```json" in json_str:
-            json_str = json_str.split("```json")[1].split("```")[0]
-        elif "```" in json_str:
-            json_str = json_str.split("```")[1].split("```")[0]
-
-        result = json.loads(json_str.strip())
-
-        # Validate and clean response
-        fields = result.get("fields", {})
-        confidence = result.get("confidence", {})
-
-        # Remove None values
-        fields = {k: v for k, v in fields.items() if v is not None}
-        confidence = {k: v for k, v in confidence.items() if confidence.get(k) is not None}
-
-        # Validate numbers are in thousands (sanity check for very large outliers)
-        errors = []
-        for field, value in list(fields.items()):
-            if not isinstance(value, (int, float)):
-                try:
-                    fields[field] = float(value)
-                except (ValueError, TypeError):
-                    errors.append(f"{field}: could not convert to number")
-                    del fields[field]
-                    if field in confidence:
-                        del confidence[field]
-            elif value > 1_000_000_000:  # > 1 trillion in thousands seems wrong
-                logger.warning(f"{field} value {value} seems too large for thousands")
+        result = _extract_json_from_response(response_text)
+        fields, confidence, errors = _validate_and_clean_response(result)
 
         return {
             "fields": fields,

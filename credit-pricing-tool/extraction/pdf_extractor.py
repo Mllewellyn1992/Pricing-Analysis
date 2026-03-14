@@ -69,11 +69,71 @@ def _detect_year_columns(columns):
     return year_cols
 
 
+def _find_label_cell(row_data, year_cols):
+    """Find the label cell index (first non-year, non-numeric cell). Returns index or None."""
+    for ci, cell in enumerate(row_data):
+        if ci in year_cols:
+            continue
+        if cell and str(cell).strip() and not _is_numeric_str(cell):
+            return ci
+    return None
+
+
+def _classify_year_columns(row_data, year_cols):
+    """Split year columns into empty and filled lists. Returns (empty, filled)."""
+    empty = []
+    filled = []
+    for ci, yr in sorted(year_cols.items(), key=lambda x: x[1]):
+        val = row_data[ci] if ci < len(row_data) else ""
+        if not val or not str(val).strip():
+            empty.append((ci, yr))
+        else:
+            filled.append((ci, yr))
+    return empty, filled
+
+
+def _extract_unmatched_numbers(label, filled_year_cols, row_data):
+    """Extract real financial numbers from label that aren't already in filled columns."""
+    embedded_nums = _NUMBER_PATTERN.findall(label)
+    real_nums = []
+    for num_str in embedded_nums:
+        cleaned = re.sub(r"[$£€,\s]", "", num_str)
+        if cleaned.startswith("(") and cleaned.endswith(")"):
+            cleaned = cleaned[1:-1]
+        try:
+            if abs(float(cleaned)) >= 100:
+                real_nums.append(num_str)
+        except ValueError:
+            pass
+
+    filled_vals = {str(row_data[ci]).strip() for ci, _ in filled_year_cols if ci < len(row_data)}
+    return [n for n in real_nums if n.strip() not in filled_vals]
+
+
+def _assign_numbers_to_row(row_data, label_ci, label, unmatched_nums, sorted_empty):
+    """Assign unmatched numbers to empty year columns and clean the label. Returns (new_row, repaired)."""
+    new_row = list(row_data)
+    repaired = False
+
+    can_assign = (len(unmatched_nums) == len(sorted_empty) or
+                  (len(unmatched_nums) == 1 and len(sorted_empty) == 1))
+
+    if can_assign:
+        for (ci, _yr), num_str in zip(sorted_empty, unmatched_nums):
+            while len(new_row) <= ci:
+                new_row.append("")
+            new_row[ci] = num_str
+        clean_label = label
+        for num_str in unmatched_nums:
+            clean_label = clean_label.replace(num_str, "", 1)
+        new_row[label_ci] = re.sub(r"\s+", " ", clean_label).strip()
+        repaired = True
+
+    return new_row, repaired
+
+
 def repair_label_merge(columns, rows):
     """Fix the label-merge artifact: values embedded in the label cell.
-
-    When extraction merges a label cell with adjacent value cells, the first cell
-    looks like "Revenue 1,371,343 1,726,686" while the year columns are empty.
 
     Returns (columns, repaired_rows, repair_count).
     """
@@ -89,90 +149,28 @@ def repair_label_merge(columns, rows):
             repaired_rows.append(row_data)
             continue
 
-        # Find the label cell (first non-year, non-numeric cell)
-        label_ci = None
-        for ci, cell in enumerate(row_data):
-            if ci in year_cols:
-                continue
-            if cell and str(cell).strip() and not _is_numeric_str(cell):
-                label_ci = ci
-                break
-
+        label_ci = _find_label_cell(row_data, year_cols)
         if label_ci is None:
             repaired_rows.append(row_data)
             continue
 
         label = str(row_data[label_ci])
-
-        # Check if year columns are empty for this row
-        empty_year_cols = []
-        filled_year_cols = []
-        for ci, yr in sorted(year_cols.items(), key=lambda x: x[1]):
-            val = row_data[ci] if ci < len(row_data) else ""
-            if not val or not str(val).strip():
-                empty_year_cols.append((ci, yr))
-            else:
-                filled_year_cols.append((ci, yr))
+        empty_year_cols, filled_year_cols = _classify_year_columns(row_data, year_cols)
 
         if not empty_year_cols:
             repaired_rows.append(row_data)
             continue
 
-        # Extract embedded numbers from label
-        embedded_nums = _NUMBER_PATTERN.findall(label)
-        # Filter out small numbers that are likely note references (< 100)
-        real_nums = []
-        for num_str in embedded_nums:
-            cleaned = re.sub(r"[$£€,\s]", "", num_str)
-            if cleaned.startswith("(") and cleaned.endswith(")"):
-                cleaned = cleaned[1:-1]
-            try:
-                val = float(cleaned)
-                if abs(val) >= 100:
-                    real_nums.append(num_str)
-            except ValueError:
-                pass
-
-        # Filter out numbers already present in filled columns
-        filled_vals = set()
-        for ci, yr in filled_year_cols:
-            v = str(row_data[ci]).strip()
-            if v:
-                filled_vals.add(v)
-
-        unmatched_nums = [n for n in real_nums if n.strip() not in filled_vals]
-
+        unmatched_nums = _extract_unmatched_numbers(label, filled_year_cols, row_data)
         if not unmatched_nums or len(unmatched_nums) > len(empty_year_cols):
             repaired_rows.append(row_data)
             continue
 
-        # Assign: numbers to empty year columns (sorted by year)
-        new_row = list(row_data)
         sorted_empty = sorted(empty_year_cols, key=lambda x: x[1])
-        if len(unmatched_nums) == len(sorted_empty):
-            for (ci, yr), num_str in zip(sorted_empty, unmatched_nums):
-                if ci < len(new_row):
-                    new_row[ci] = num_str
-                else:
-                    while len(new_row) <= ci:
-                        new_row.append("")
-                    new_row[ci] = num_str
-            # Clean the label
-            clean_label = label
-            for num_str in unmatched_nums:
-                clean_label = clean_label.replace(num_str, "", 1)
-            clean_label = re.sub(r"\s+", " ", clean_label).strip()
-            new_row[label_ci] = clean_label
+        new_row, was_repaired = _assign_numbers_to_row(
+            row_data, label_ci, label, unmatched_nums, sorted_empty)
+        if was_repaired:
             repair_count += 1
-        elif len(unmatched_nums) == 1 and len(sorted_empty) == 1:
-            ci, yr = sorted_empty[0]
-            if ci < len(new_row):
-                new_row[ci] = unmatched_nums[0]
-            clean_label = label.replace(unmatched_nums[0], "", 1)
-            clean_label = re.sub(r"\s+", " ", clean_label).strip()
-            new_row[label_ci] = clean_label
-            repair_count += 1
-
         repaired_rows.append(new_row)
 
     return columns, repaired_rows, repair_count

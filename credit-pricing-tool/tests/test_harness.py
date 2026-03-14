@@ -214,125 +214,81 @@ def notch_difference(rating_a: str, rating_b: str) -> int:
 
 # ── Main harness ─────────────────────────────────────────────────────────
 
-def run_harness():
-    print("=" * 80)
-    print("CROSS-ENGINE TEST HARNESS")
-    print("S&P Engine vs Moody's Engine — Same Financials, Different Methodologies")
-    print("=" * 80)
+def _run_sp_engine(financials, sp_sector):
+    """Run S&P engine for a company. Returns (rating, ratios) or (error_str, None)."""
+    defaults = get_defaults(sp_sector)
+    try:
+        result = rate_company_sp(
+            financials=financials, sector_id=sp_sector,
+            cyclicality=defaults["cyclicality"],
+            competitive_risk=defaults["competitive_risk"],
+            country_risk=2, quant_only=True,
+        )
+        ratios = result["computed_ratios"]
+        print(f"\n  S&P Engine:")
+        print(f"    Business Risk: {result['business_risk_score']}, Financial Risk: {result['financial_risk_score']}")
+        print(f"    Anchor: {result['anchor_rating']}, Final: {result['final_rating']}")
+        print(f"    Key ratios: Debt/EBITDA={ratios['debt_to_ebitda_x']:.2f}x, "
+              f"FFO/Debt={ratios['ffo_to_debt_pct']:.1f}%, "
+              f"EBITDA/Int={ratios['ebitda_to_interest_x']:.1f}x")
+        return result["final_rating"], ratios
+    except Exception as e:
+        print(f"\n  S&P Engine: ERROR - {e}")
+        return f"ERROR: {e}", None
 
-    results = []
 
-    for name, company in TEST_COMPANIES.items():
-        print(f"\n{'=' * 70}")
-        print(f"COMPANY: {name}")
-        print(f"Description: {company['description']}")
-        print(f"S&P sector: {company['sp_sector']}")
-        print(f"Moody's sector: {company['moodys_sector']}")
-        print(f"{'=' * 70}")
+def _run_moodys_engine(financials, moodys_sector):
+    """Run Moody's engine for a company. Returns (sp_equiv, metrics) or (error_str, None)."""
+    try:
+        result = rate_company_moodys(
+            financials=financials, methodology_id=moodys_sector, quant_only=True,
+        )
+        metrics = result["computed_metrics"]
+        print(f"\n  Moody's Engine:")
+        print(f"    Moody's Rating: {result['moody_rating']} (S&P equiv: {result['sp_equivalent']})")
+        print(f"    Composite Score: {result['composite_score']:.2f}")
+        print(f"    Key metrics: Debt/EBITDA={metrics['debt_ebitda_x']:.2f}x, "
+              f"EBIT/Int={metrics['ebit_interest_x']:.1f}x, "
+              f"RCF/NetDebt={metrics['rcf_net_debt_pct']:.1f}%")
+        return result["sp_equivalent"], metrics
+    except Exception as e:
+        print(f"\n  Moody's Engine: ERROR - {e}")
+        return f"ERROR: {e}", None
 
-        financials = company["financials"]
-        sp_sector = company["sp_sector"]
-        moodys_sector = company["moodys_sector"]
 
-        # Get S&P industry defaults
-        defaults = get_defaults(sp_sector)
-
-        # Run S&P engine
-        try:
-            sp_result = rate_company_sp(
-                financials=financials,
-                sector_id=sp_sector,
-                cyclicality=defaults["cyclicality"],
-                competitive_risk=defaults["competitive_risk"],
-                country_risk=2,  # NZ
-                quant_only=True,
-            )
-            sp_rating = sp_result["final_rating"]
-            sp_anchor = sp_result["anchor_rating"]
-            sp_brs = sp_result["business_risk_score"]
-            sp_frs = sp_result["financial_risk_score"]
-            sp_ratios = sp_result["computed_ratios"]
-            print(f"\n  S&P Engine:")
-            print(f"    Business Risk: {sp_brs}, Financial Risk: {sp_frs}")
-            print(f"    Anchor: {sp_anchor}, Final: {sp_rating}")
-            print(f"    Key ratios: Debt/EBITDA={sp_ratios['debt_to_ebitda_x']:.2f}x, "
-                  f"FFO/Debt={sp_ratios['ffo_to_debt_pct']:.1f}%, "
-                  f"EBITDA/Int={sp_ratios['ebitda_to_interest_x']:.1f}x")
-        except Exception as e:
-            sp_rating = f"ERROR: {e}"
-            sp_anchor = None
-            print(f"\n  S&P Engine: ERROR - {e}")
-
-        # Run Moody's engine
-        try:
-            moodys_result = rate_company_moodys(
-                financials=financials,
-                methodology_id=moodys_sector,
-                quant_only=True,
-            )
-            moody_rating = moodys_result["moody_rating"]
-            moody_sp_equiv = moodys_result["sp_equivalent"]
-            moody_score = moodys_result["composite_score"]
-            moody_metrics = moodys_result["computed_metrics"]
-            print(f"\n  Moody's Engine:")
-            print(f"    Moody's Rating: {moody_rating} (S&P equiv: {moody_sp_equiv})")
-            print(f"    Composite Score: {moody_score:.2f}")
-            print(f"    Key metrics: Debt/EBITDA={moody_metrics['debt_ebitda_x']:.2f}x, "
-                  f"EBIT/Int={moody_metrics['ebit_interest_x']:.1f}x, "
-                  f"RCF/NetDebt={moody_metrics['rcf_net_debt_pct']:.1f}%")
-        except Exception as e:
-            moody_rating = None
-            moody_sp_equiv = f"ERROR: {e}"
-            moody_score = None
-            print(f"\n  Moody's Engine: ERROR - {e}")
-
-        # Compare
-        if isinstance(sp_rating, str) and sp_rating in SP_SCALE and moody_sp_equiv in SP_SCALE:
-            diff = notch_difference(sp_rating, moody_sp_equiv)
-            if abs(diff) <= 1:
-                agreement = "STRONG AGREEMENT"
-            elif abs(diff) <= 2:
-                agreement = "MODERATE AGREEMENT"
-            else:
-                agreement = f"DIVERGENCE ({abs(diff)} notches)"
-
-            # Determine which seems more reasonable
-            # (basic heuristic: check if rating makes sense given key ratios)
-            debt_ebitda = sp_ratios["debt_to_ebitda_x"] if isinstance(sp_rating, str) else 0
-            if debt_ebitda < 2.0:
-                expected_range = "A to AA"
-            elif debt_ebitda < 3.5:
-                expected_range = "BBB to A"
-            elif debt_ebitda < 5.0:
-                expected_range = "BB to BBB"
-            else:
-                expected_range = "B to BB"
-
-            print(f"\n  COMPARISON:")
-            print(f"    S&P Final:     {sp_rating}")
-            print(f"    Moody's equiv: {moody_sp_equiv}")
-            print(f"    Notch diff:    {abs(diff)} ({agreement})")
-            print(f"    Expected range (from Debt/EBITDA={debt_ebitda:.1f}x): {expected_range}")
-
-            results.append({
-                "company": name,
-                "sp_rating": sp_rating,
-                "moodys_sp_equiv": moody_sp_equiv,
-                "notch_diff": abs(diff),
-                "agreement": agreement,
-                "debt_ebitda": debt_ebitda,
-            })
+def _compare_ratings(sp_rating, sp_ratios, moody_sp_equiv, name):
+    """Compare S&P and Moody's ratings. Returns a result dict."""
+    if isinstance(sp_rating, str) and sp_rating in SP_SCALE and moody_sp_equiv in SP_SCALE:
+        diff = notch_difference(sp_rating, moody_sp_equiv)
+        if abs(diff) <= 1:
+            agreement = "STRONG AGREEMENT"
+        elif abs(diff) <= 2:
+            agreement = "MODERATE AGREEMENT"
         else:
-            print(f"\n  COMPARISON: Cannot compare (one or both engines errored)")
-            results.append({
-                "company": name,
-                "sp_rating": str(sp_rating),
-                "moodys_sp_equiv": str(moody_sp_equiv),
-                "notch_diff": None,
-                "agreement": "ERROR",
-            })
+            agreement = f"DIVERGENCE ({abs(diff)} notches)"
 
-    # Summary
+        debt_ebitda = sp_ratios["debt_to_ebitda_x"] if sp_ratios else 0
+        if debt_ebitda < 2.0: expected_range = "A to AA"
+        elif debt_ebitda < 3.5: expected_range = "BBB to A"
+        elif debt_ebitda < 5.0: expected_range = "BB to BBB"
+        else: expected_range = "B to BB"
+
+        print(f"\n  COMPARISON:")
+        print(f"    S&P Final:     {sp_rating}")
+        print(f"    Moody's equiv: {moody_sp_equiv}")
+        print(f"    Notch diff:    {abs(diff)} ({agreement})")
+        print(f"    Expected range (from Debt/EBITDA={debt_ebitda:.1f}x): {expected_range}")
+
+        return {"company": name, "sp_rating": sp_rating, "moodys_sp_equiv": moody_sp_equiv,
+                "notch_diff": abs(diff), "agreement": agreement, "debt_ebitda": debt_ebitda}
+    else:
+        print(f"\n  COMPARISON: Cannot compare (one or both engines errored)")
+        return {"company": name, "sp_rating": str(sp_rating), "moodys_sp_equiv": str(moody_sp_equiv),
+                "notch_diff": None, "agreement": "ERROR"}
+
+
+def _print_summary(results):
+    """Print the final summary table."""
     print(f"\n\n{'=' * 80}")
     print("SUMMARY")
     print(f"{'=' * 80}")
@@ -342,7 +298,6 @@ def run_harness():
         diff_str = str(r["notch_diff"]) if r["notch_diff"] is not None else "N/A"
         print(f"{r['company']:<30} {r['sp_rating']:<8} {r['moodys_sp_equiv']:<10} {diff_str:<6} {r['agreement']}")
 
-    # Overall assessment
     valid = [r for r in results if r["notch_diff"] is not None]
     if valid:
         avg_diff = sum(r["notch_diff"] for r in valid) / len(valid)
@@ -350,6 +305,27 @@ def run_harness():
         print(f"\nAverage notch difference: {avg_diff:.1f}")
         print(f"Strong agreement (≤1 notch): {strong}/{len(valid)}")
         print(f"Engines {'CONVERGE well' if avg_diff <= 2 else 'DIVERGE significantly'}")
+
+
+def run_harness():
+    print("=" * 80)
+    print("CROSS-ENGINE TEST HARNESS")
+    print("S&P Engine vs Moody's Engine — Same Financials, Different Methodologies")
+    print("=" * 80)
+
+    results = []
+    for name, company in TEST_COMPANIES.items():
+        print(f"\n{'=' * 70}")
+        print(f"COMPANY: {name}")
+        print(f"Description: {company['description']}")
+        print(f"S&P sector: {company['sp_sector']}, Moody's sector: {company['moodys_sector']}")
+        print(f"{'=' * 70}")
+
+        sp_rating, sp_ratios = _run_sp_engine(company["financials"], company["sp_sector"])
+        moody_sp_equiv, _ = _run_moodys_engine(company["financials"], company["moodys_sector"])
+        results.append(_compare_ratings(sp_rating, sp_ratios, moody_sp_equiv, name))
+
+    _print_summary(results)
 
 
 if __name__ == "__main__":

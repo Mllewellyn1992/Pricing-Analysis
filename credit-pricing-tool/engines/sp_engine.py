@@ -220,6 +220,215 @@ def _apply_notches(scale: list[str], rating: str, notch_delta: int) -> str:
     return scale[new_idx]
 
 
+def _extract_financial_inputs(financials: dict) -> dict:
+    """Extract and compute derived financial metrics from raw inputs."""
+    revenue_mn = financials.get("revenue_mn", 0.0)
+    ebit_mn = financials.get("ebit_mn", 0.0)
+    dep_mn = financials.get("depreciation_mn", 0.0)
+    amort_mn = financials.get("amortization_mn", 0.0)
+    interest_expense_mn = financials.get("interest_expense_mn", 0.0)
+    cash_interest_paid_mn = financials.get("cash_interest_paid_mn", interest_expense_mn)
+    cash_taxes_paid_mn = financials.get("cash_taxes_paid_mn", ebit_mn * 0.28)
+    total_debt_mn = financials.get("total_debt_mn",
+        financials.get("st_debt_mn", 0.0) + financials.get("cpltd_mn", 0.0) + financials.get("lt_debt_net_mn", 0.0)
+    )
+    cash_mn = financials.get("cash_mn", 0.0)
+    avg_capital_mn = financials.get("avg_capital_mn",
+        total_debt_mn + financials.get("total_equity_mn", 0.0)
+    )
+    cfo_mn = financials.get("cfo_mn", 0.0)
+    capex_mn = financials.get("capex_mn", 0.0)
+    dividends_paid_mn = financials.get("dividends_paid_mn",
+        financials.get("common_dividends_mn", 0.0)
+    )
+    share_buybacks_mn = financials.get("share_buybacks_mn", 0.0)
+
+    ebitda_mn = ebit_mn + dep_mn + amort_mn
+    ffo_mn = ebitda_mn - cash_interest_paid_mn - cash_taxes_paid_mn
+    return {
+        "revenue_mn": revenue_mn, "ebit_mn": ebit_mn, "ebitda_mn": ebitda_mn,
+        "ffo_mn": ffo_mn, "total_debt_mn": total_debt_mn, "cash_mn": cash_mn,
+        "cfo_mn": cfo_mn, "capex_mn": capex_mn, "avg_capital_mn": avg_capital_mn,
+        "cash_interest_paid_mn": cash_interest_paid_mn, "cash_taxes_paid_mn": cash_taxes_paid_mn,
+        "interest_expense_mn": interest_expense_mn, "dividends_paid_mn": dividends_paid_mn,
+        "share_buybacks_mn": share_buybacks_mn,
+    }
+
+
+def _compute_ratios(inputs: dict) -> dict:
+    """Compute all derived financial ratios from extracted inputs."""
+    ebitda_mn = inputs["ebitda_mn"]
+    ffo_mn = inputs["ffo_mn"]
+    total_debt_mn = inputs["total_debt_mn"]
+    cfo_mn = inputs["cfo_mn"]
+    capex_mn = inputs["capex_mn"]
+    ebit_mn = inputs["ebit_mn"]
+    revenue_mn = inputs["revenue_mn"]
+    avg_capital_mn = inputs["avg_capital_mn"]
+    cash_interest_paid_mn = inputs["cash_interest_paid_mn"]
+    interest_expense_mn = inputs["interest_expense_mn"]
+    dividends_paid_mn = inputs["dividends_paid_mn"]
+    share_buybacks_mn = inputs["share_buybacks_mn"]
+
+    ffo_to_debt_pct = (ffo_mn / total_debt_mn) * 100.0 if total_debt_mn else 0.0
+    debt_to_ebitda_x = (total_debt_mn / ebitda_mn) if ebitda_mn else 0.0
+    ffo_to_cash_interest_x = ffo_mn / cash_interest_paid_mn if cash_interest_paid_mn else 0.0
+    ebitda_to_interest_x = ebitda_mn / interest_expense_mn if interest_expense_mn else 0.0
+    cfo_to_debt_pct = (cfo_mn / total_debt_mn) * 100.0 if total_debt_mn else 0.0
+    focf_mn = cfo_mn - capex_mn
+    focf_to_debt_pct = (focf_mn / total_debt_mn) * 100.0 if total_debt_mn else 0.0
+    dcf_mn = focf_mn - dividends_paid_mn - share_buybacks_mn
+    dcf_to_debt_pct = (dcf_mn / total_debt_mn) * 100.0 if total_debt_mn else 0.0
+    ebit_margin_pct = (ebit_mn / revenue_mn) * 100.0 if revenue_mn else 0.0
+    ebitda_margin_pct = (ebitda_mn / revenue_mn) * 100.0 if revenue_mn else 0.0
+    return_on_capital_pct = (ebit_mn / avg_capital_mn) * 100.0 if avg_capital_mn else 0.0
+
+    return {
+        "ebitda_mn": ebitda_mn, "ffo_mn": ffo_mn, "ffo_to_debt_pct": ffo_to_debt_pct,
+        "debt_to_ebitda_x": debt_to_ebitda_x, "ffo_to_cash_interest_x": ffo_to_cash_interest_x,
+        "ebitda_to_interest_x": ebitda_to_interest_x, "cfo_to_debt_pct": cfo_to_debt_pct,
+        "focf_to_debt_pct": focf_to_debt_pct, "dcf_to_debt_pct": dcf_to_debt_pct,
+        "ebit_margin_pct": ebit_margin_pct, "ebitda_margin_pct": ebitda_margin_pct,
+        "return_on_capital_pct": return_on_capital_pct,
+    }
+
+
+def _compute_modifiers(corporate_cfg: dict, quant_only: bool, financial_policy: str,
+                       capital_structure: str, diversification: str, comparable_ratings: str,
+                       mg_ownership_structure: str, mg_board_structure: str,
+                       mg_risk_management: str, mg_transparency: str, mg_management: str) -> tuple:
+    """Compute notch delta and management assessment modifiers."""
+    notch_delta = 0
+    mg_assessment = "neutral"
+    if not quant_only:
+        modifiers = corporate_cfg["modifiers"]
+        notch_delta += modifiers["financial_policy"].get(financial_policy, 0)
+        notch_delta += modifiers["capital_structure"].get(capital_structure, 0)
+        notch_delta += modifiers["diversification"].get(diversification, 0)
+        notch_delta += modifiers["comparable_ratings"].get(comparable_ratings, 0)
+
+        mg_map = {"positive": 1, "neutral": 2, "negative": 3}
+        mg_scores = [
+            mg_map.get(mg_ownership_structure, 2), mg_map.get(mg_board_structure, 2),
+            mg_map.get(mg_risk_management, 2), mg_map.get(mg_transparency, 2),
+            mg_map.get(mg_management, 2),
+        ]
+        mg_avg = sum(mg_scores) / len(mg_scores)
+        if mg_avg <= 1.5:
+            mg_assessment = "positive"
+        elif mg_avg <= 2.3:
+            mg_assessment = "neutral"
+        elif mg_avg <= 2.8:
+            mg_assessment = "moderately_negative"
+            notch_delta -= 1
+        else:
+            mg_assessment = "negative"
+            notch_delta -= 2
+    return notch_delta, mg_assessment
+
+
+def _get_cp_metrics(quant_only: bool, competitive_advantage: int, scale_scope: int, operating_efficiency: int) -> dict:
+    """Build competitive position metrics based on quant_only flag."""
+    if quant_only:
+        return {
+            "competitive_advantage_band": "3", "scale_scope_diversity_band": "3",
+            "operating_efficiency_band": "3",
+        }
+    else:
+        return {
+            "competitive_advantage_band": str(competitive_advantage),
+            "scale_scope_diversity_band": str(scale_scope),
+            "operating_efficiency_band": str(operating_efficiency),
+        }
+
+
+def _compute_business_and_financial_risks(corporate_cfg: dict, industry_cfg: dict, sector_cfg: dict,
+                                             computed_ratios: dict, quant_only: bool,
+                                             competitive_advantage: int, scale_scope: int,
+                                             operating_efficiency: int, cyclicality: int,
+                                             competitive_risk: int, country_risk: int) -> tuple:
+    """Compute business and financial risk scores with CICRA matrix."""
+    cp_metrics = _get_cp_metrics(quant_only, competitive_advantage, scale_scope, operating_efficiency)
+    cp_result = score_methodology(sector_cfg, cp_metrics)
+    competitive_position_score = _clamp_score(cp_result["composite_score"])
+
+    industry_matrix = industry_cfg["matrix"]
+    industry_risk_score = industry_matrix[cyclicality - 1][competitive_risk - 1]
+    cicra_matrix = corporate_cfg["cicra_matrix"]
+    cicra_score = cicra_matrix[industry_risk_score - 1][country_risk - 1]
+    business_risk_score = _clamp_score((cicra_score + competitive_position_score) / 2)
+
+    table_key = "standard" if cicra_score > 2 else ("medial" if cicra_score == 2 else "low")
+    ratio_table = corporate_cfg["financial_risk_tables"][table_key]
+    ffo_label = _categorize_ratio(
+        computed_ratios["ffo_to_debt_pct"], ratio_table["FFO_to_debt_pct"]["bands"], "higher_better"
+    )
+    debt_label = _categorize_ratio(
+        computed_ratios["debt_to_ebitda_x"], ratio_table["debt_to_EBITDA_x"]["bands"], "lower_better"
+    )
+    core_score = max(_label_to_financial_score(ffo_label), _label_to_financial_score(debt_label))
+    financial_risk_score = _clamp_score(core_score)
+
+    return (cp_result, competitive_position_score, industry_risk_score, cicra_score,
+            business_risk_score, financial_risk_score, ffo_label, debt_label, core_score)
+
+
+def _apply_liquidity_cap(corporate_cfg: dict, liquidity_cfg: dict, quant_only: bool,
+                         liquidity_descriptor: str, rating_after_modifiers: str) -> str:
+    """Apply liquidity cap to final rating."""
+    cap_rating = liquidity_cfg["descriptors"]["adequate"].get("cap_rating") if quant_only \
+        else liquidity_cfg["descriptors"][liquidity_descriptor].get("cap_rating")
+    final_rating = rating_after_modifiers
+    if cap_rating:
+        rating_scale = corporate_cfg["rating_scale"]
+        cap_idx = _rating_to_index(rating_scale, cap_rating)
+        final_idx = _rating_to_index(rating_scale, rating_after_modifiers)
+        if final_idx < cap_idx:
+            final_rating = cap_rating
+    return final_rating
+
+
+def _build_workings(financials: dict, sector_id: str, cyclicality: int, competitive_risk: int,
+                    country_risk: int, quant_only: bool, computed_ratios: dict,
+                    competitive_position_score: int, industry_risk_score: int, cicra_score: int,
+                    business_risk_score: int, ffo_label: str, debt_label: str, core_score: float,
+                    financial_risk_score: int, notch_delta: int, mg_assessment: str,
+                    liquidity_sources_mn: float, liquidity_uses_mn: float) -> dict:
+    """Build the workings audit trail."""
+    liquidity_ratio = (liquidity_sources_mn / liquidity_uses_mn) if liquidity_uses_mn else 0.0
+    liquidity_surplus = liquidity_sources_mn - liquidity_uses_mn
+
+    return {
+        "input_financials": financials,
+        "sector_id": sector_id,
+        "cyclicality": cyclicality,
+        "competitive_risk": competitive_risk,
+        "country_risk": country_risk,
+        "quant_only": quant_only,
+        "computed_ratios": computed_ratios,
+        "competitive_position_score": competitive_position_score,
+        "industry_risk_score": industry_risk_score,
+        "cicra_score": cicra_score,
+        "business_risk_score": business_risk_score,
+        "financial_risk_profile": {
+            "ffo_to_debt_label": ffo_label,
+            "debt_to_ebitda_label": debt_label,
+            "core_score": core_score,
+        },
+        "financial_risk_score": financial_risk_score,
+        "modifiers": {
+            "notch_delta": notch_delta,
+            "mg_assessment": mg_assessment,
+        },
+        "liquidity": {
+            "sources_mn": liquidity_sources_mn,
+            "uses_mn": liquidity_uses_mn,
+            "ratio": liquidity_ratio,
+            "surplus_mn": liquidity_surplus,
+        },
+    }
+
+
 def rate_company_sp(
     financials: dict,
     sector_id: str,
@@ -268,211 +477,45 @@ def rate_company_sp(
             anchor_rating, final_rating, business_risk_score, financial_risk_score,
             computed_ratios, factor_scores, workings (detailed audit trail)
     """
-
-    # Load configs
     corporate_cfg = load_yaml(CONFIG_DIR / "corporate_method.yaml")
     industry_cfg = load_yaml(CONFIG_DIR / "industry_risk.yaml")
     liquidity_cfg = load_yaml(CONFIG_DIR / "liquidity.yaml")
     sector_cfg = load_sector_methodology(sector_id)
 
-    # ===== 1. Compute core ratios from financials =====
-    revenue_mn = financials.get("revenue_mn", 0.0)
-    ebit_mn = financials.get("ebit_mn", 0.0)
-    dep_mn = financials.get("depreciation_mn", 0.0)
-    amort_mn = financials.get("amortization_mn", 0.0)
-    interest_expense_mn = financials.get("interest_expense_mn", 0.0)
-    cash_interest_paid_mn = financials.get("cash_interest_paid_mn", interest_expense_mn)
-    cash_taxes_paid_mn = financials.get("cash_taxes_paid_mn", ebit_mn * 0.28)
-    # total_debt_mn: compute from components if not provided directly
-    total_debt_mn = financials.get("total_debt_mn",
-        financials.get("st_debt_mn", 0.0) + financials.get("cpltd_mn", 0.0) + financials.get("lt_debt_net_mn", 0.0)
-    )
-    cash_mn = financials.get("cash_mn", 0.0)
-    avg_capital_mn = financials.get("avg_capital_mn",
-        total_debt_mn + financials.get("total_equity_mn", 0.0)
-    )
-    cfo_mn = financials.get("cfo_mn", 0.0)
-    capex_mn = financials.get("capex_mn", 0.0)
-    dividends_paid_mn = financials.get("dividends_paid_mn",
-        financials.get("common_dividends_mn", 0.0)
-    )
-    share_buybacks_mn = financials.get("share_buybacks_mn", 0.0)
+    inputs = _extract_financial_inputs(financials)
+    computed_ratios = _compute_ratios(inputs)
 
-    # Derived metrics
-    ebitda_mn = ebit_mn + dep_mn + amort_mn
-    ffo_mn = ebitda_mn - cash_interest_paid_mn - cash_taxes_paid_mn
-    ffo_to_debt_pct = (ffo_mn / total_debt_mn) * 100.0 if total_debt_mn else 0.0
-    debt_to_ebitda_x = (total_debt_mn / ebitda_mn) if ebitda_mn else 0.0
-    ffo_to_cash_interest_x = (
-        ffo_mn / cash_interest_paid_mn if cash_interest_paid_mn else 0.0
-    )
-    ebitda_to_interest_x = (
-        ebitda_mn / interest_expense_mn if interest_expense_mn else 0.0
-    )
-    cfo_to_debt_pct = (cfo_mn / total_debt_mn) * 100.0 if total_debt_mn else 0.0
-    focf_mn = cfo_mn - capex_mn
-    focf_to_debt_pct = (focf_mn / total_debt_mn) * 100.0 if total_debt_mn else 0.0
-    dcf_mn = focf_mn - dividends_paid_mn - share_buybacks_mn
-    dcf_to_debt_pct = (dcf_mn / total_debt_mn) * 100.0 if total_debt_mn else 0.0
-    ebit_margin_pct = (ebit_mn / revenue_mn) * 100.0 if revenue_mn else 0.0
-    ebitda_margin_pct = (ebitda_mn / revenue_mn) * 100.0 if revenue_mn else 0.0
-    return_on_capital_pct = (
-        (ebit_mn / avg_capital_mn) * 100.0 if avg_capital_mn else 0.0
+    (cp_result, competitive_position_score, industry_risk_score, cicra_score,
+     business_risk_score, financial_risk_score, ffo_label, debt_label,
+     core_score) = _compute_business_and_financial_risks(
+        corporate_cfg, industry_cfg, sector_cfg, computed_ratios, quant_only,
+        competitive_advantage, scale_scope, operating_efficiency, cyclicality,
+        competitive_risk, country_risk
     )
 
-    computed_ratios = {
-        "ebitda_mn": ebitda_mn,
-        "ffo_mn": ffo_mn,
-        "ffo_to_debt_pct": ffo_to_debt_pct,
-        "debt_to_ebitda_x": debt_to_ebitda_x,
-        "ffo_to_cash_interest_x": ffo_to_cash_interest_x,
-        "ebitda_to_interest_x": ebitda_to_interest_x,
-        "cfo_to_debt_pct": cfo_to_debt_pct,
-        "focf_to_debt_pct": focf_to_debt_pct,
-        "dcf_to_debt_pct": dcf_to_debt_pct,
-        "ebit_margin_pct": ebit_margin_pct,
-        "ebitda_margin_pct": ebitda_margin_pct,
-        "return_on_capital_pct": return_on_capital_pct,
-    }
-
-    # ===== 2. Competitive Position Score =====
-    if quant_only:
-        # Use neutral defaults (band 3 = neutral/average in 1-6 scale)
-        cp_metrics = {
-            "competitive_advantage_band": "3",
-            "scale_scope_diversity_band": "3",
-            "operating_efficiency_band": "3",
-        }
-    else:
-        # Map integers 1-6 directly to band strings
-        cp_metrics = {
-            "competitive_advantage_band": str(competitive_advantage),
-            "scale_scope_diversity_band": str(scale_scope),
-            "operating_efficiency_band": str(operating_efficiency),
-        }
-
-    cp_result = score_methodology(sector_cfg, cp_metrics)
-    cp_score = cp_result["composite_score"]
-    competitive_position_score = _clamp_score(cp_score)
-
-    # ===== 3. Industry Risk (from matrix) =====
-    industry_matrix = industry_cfg["matrix"]
-    industry_risk_score = industry_matrix[cyclicality - 1][competitive_risk - 1]
-
-    # ===== 4. CICRA (Corporate Industry Country Risk Assessment) =====
-    cicra_matrix = corporate_cfg["cicra_matrix"]
-    cicra_score = cicra_matrix[industry_risk_score - 1][country_risk - 1]
-
-    # ===== 5. Business Risk Profile =====
-    business_risk_score = _clamp_score((cicra_score + competitive_position_score) / 2)
-
-    # ===== 6. Financial Risk Profile =====
-    table_key = "standard"
-    if cicra_score == 1:
-        table_key = "low"
-    elif cicra_score == 2:
-        table_key = "medial"
-    ratio_table = corporate_cfg["financial_risk_tables"][table_key]
-
-    ffo_label = _categorize_ratio(
-        ffo_to_debt_pct, ratio_table["FFO_to_debt_pct"]["bands"], "higher_better"
+    notch_delta, mg_assessment = _compute_modifiers(
+        corporate_cfg, quant_only, financial_policy, capital_structure, diversification,
+        comparable_ratings, mg_ownership_structure, mg_board_structure, mg_risk_management,
+        mg_transparency, mg_management
     )
-    debt_label = _categorize_ratio(
-        debt_to_ebitda_x, ratio_table["debt_to_EBITDA_x"]["bands"], "lower_better"
-    )
-    core_score = max(_label_to_financial_score(ffo_label), _label_to_financial_score(debt_label))
-    financial_risk_score = _clamp_score(core_score)
 
-    # ===== 7. Anchor Rating =====
     rating_scale = corporate_cfg["rating_scale"]
     anchor_by_avg = corporate_cfg["anchor_by_avg"]
     anchor_key = _clamp_score((business_risk_score + financial_risk_score) / 2)
-    # Try both int and string keys for YAML compatibility
     anchor_rating = anchor_by_avg.get(anchor_key) or anchor_by_avg.get(str(anchor_key), "BBB")
-
-    # ===== 8. Apply Modifiers (if not quant_only) =====
-    notch_delta = 0
-    if not quant_only:
-        modifiers = corporate_cfg["modifiers"]
-        notch_delta += modifiers["financial_policy"].get(financial_policy, 0)
-        notch_delta += modifiers["capital_structure"].get(capital_structure, 0)
-        notch_delta += modifiers["diversification"].get(diversification, 0)
-        notch_delta += modifiers["comparable_ratings"].get(comparable_ratings, 0)
-
-        # M&G modifier
-        mg_map = {"positive": 1, "neutral": 2, "negative": 3}
-        mg_scores = [
-            mg_map.get(mg_ownership_structure, 2),
-            mg_map.get(mg_board_structure, 2),
-            mg_map.get(mg_risk_management, 2),
-            mg_map.get(mg_transparency, 2),
-            mg_map.get(mg_management, 2),
-        ]
-        mg_avg = sum(mg_scores) / len(mg_scores)
-        if mg_avg <= 1.5:
-            mg_assessment = "positive"
-        elif mg_avg <= 2.3:
-            mg_assessment = "neutral"
-        elif mg_avg <= 2.8:
-            mg_assessment = "moderately_negative"
-            notch_delta -= 1
-        else:
-            mg_assessment = "negative"
-            notch_delta -= 2
-    else:
-        mg_assessment = "neutral"
-
     rating_after_modifiers = _apply_notches(rating_scale, anchor_rating, notch_delta)
 
-    # ===== 9. Apply Liquidity Cap =====
-    if quant_only:
-        cap_rating = liquidity_cfg["descriptors"]["adequate"].get("cap_rating")
-    else:
-        cap_rating = liquidity_cfg["descriptors"][liquidity_descriptor].get("cap_rating")
-
-    final_rating = rating_after_modifiers
-    if cap_rating:
-        cap_idx = _rating_to_index(rating_scale, cap_rating)
-        final_idx = _rating_to_index(rating_scale, rating_after_modifiers)
-        if final_idx < cap_idx:
-            final_rating = cap_rating
-
-    # ===== 10. Liquidity Analysis =====
-    liquidity_ratio = (
-        liquidity_sources_mn / liquidity_uses_mn if liquidity_uses_mn else 0.0
+    final_rating = _apply_liquidity_cap(
+        corporate_cfg, liquidity_cfg, quant_only, liquidity_descriptor, rating_after_modifiers
     )
-    liquidity_surplus = liquidity_sources_mn - liquidity_uses_mn
 
-    # ===== Build workings for audit trail =====
-    workings = {
-        "input_financials": financials,
-        "sector_id": sector_id,
-        "cyclicality": cyclicality,
-        "competitive_risk": competitive_risk,
-        "country_risk": country_risk,
-        "quant_only": quant_only,
-        "computed_ratios": computed_ratios,
-        "competitive_position_score": competitive_position_score,
-        "industry_risk_score": industry_risk_score,
-        "cicra_score": cicra_score,
-        "business_risk_score": business_risk_score,
-        "financial_risk_profile": {
-            "ffo_to_debt_label": ffo_label,
-            "debt_to_ebitda_label": debt_label,
-            "core_score": core_score,
-        },
-        "financial_risk_score": financial_risk_score,
-        "modifiers": {
-            "notch_delta": notch_delta,
-            "mg_assessment": mg_assessment,
-        },
-        "liquidity": {
-            "sources_mn": liquidity_sources_mn,
-            "uses_mn": liquidity_uses_mn,
-            "ratio": liquidity_ratio,
-            "surplus_mn": liquidity_surplus,
-        },
-    }
+    workings = _build_workings(
+        financials, sector_id, cyclicality, competitive_risk, country_risk,
+        quant_only, computed_ratios, competitive_position_score, industry_risk_score,
+        cicra_score, business_risk_score, ffo_label, debt_label, core_score,
+        financial_risk_score, notch_delta, mg_assessment, liquidity_sources_mn,
+        liquidity_uses_mn
+    )
 
     return {
         "anchor_rating": anchor_rating,

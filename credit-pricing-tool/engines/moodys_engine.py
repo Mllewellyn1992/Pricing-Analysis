@@ -159,110 +159,52 @@ def _score_qualitative_grid(
     raise MetricError(f"Qualitative value '{val_str}' not found in grid")
 
 
-def _score_subfactor(
-    methodology_cfg: Dict[str, Any],
-    factor_cfg: Dict[str, Any],
-    subfactor_cfg: Dict[str, Any],
-    metrics: Dict[str, Any],
-) -> Dict[str, Any]:
-    """
-    Compute the score for a single subfactor given metrics.
-    """
+def _check_special_case(case: Dict[str, Any], metrics: Dict[str, Any]) -> bool:
+    """Check if a special case condition matches the given metrics."""
+    when = case.get("when", {})
+    match = True
+    for key, expected in when.items():
+        if key == "total_debt":
+            match = match and metrics.get("total_debt") == expected
+        elif key == "total_debt_gt_0":
+            match = match and (metrics.get("total_debt", 0) > 0) == bool(expected)
+        elif key == "ebitda_lt_0":
+            match = match and (metrics.get("ebitda", 0) < 0) == bool(expected)
+        elif key == "ebitda_lte_0":
+            match = match and (metrics.get("ebitda", 0) <= 0) == bool(expected)
+        elif key == "ebit_lt_0":
+            match = match and (metrics.get("ebit", 0) < 0) == bool(expected)
+        elif key == "ebit_lte_0":
+            match = match and (metrics.get("ebit", 0) <= 0) == bool(expected)
+        elif key == "debt_ebitda_lt_0":
+            match = match and (metrics.get("debt_ebitda_x", 0) < 0) == bool(expected)
+        elif key == "debt_lt_0":
+            match = match and (metrics.get("total_debt", 0) < 0) == bool(expected)
+        elif key == "net_debt_lt_0":
+            match = match and (metrics.get("net_debt", 0) < 0) == bool(expected)
+        elif key == "rcf_gt_0":
+            match = match and (metrics.get("rcf", 0) > 0) == bool(expected)
+        elif key == "rcf_lt_0":
+            match = match and (metrics.get("rcf", 0) < 0) == bool(expected)
+        elif key == "rcf_lte_0":
+            match = match and (metrics.get("rcf", 0) <= 0) == bool(expected)
+        elif key == "debt_book_cap_lt_0":
+            match = match and (metrics.get("debt_book_cap_pct", 0) < 0) == bool(expected)
+        elif key == "interest_expense_lte_0":
+            match = match and (metrics.get("interest_expense", 0) <= 0) == bool(expected)
+        elif key == "interest_expense_gt_0":
+            match = match and (metrics.get("interest_expense", 0) > 0) == bool(expected)
+        else:
+            match = False
+        if not match:
+            break
+    return match
 
-    metric_code = subfactor_cfg["metric"]
-    direction = subfactor_cfg.get("direction", "higher_better")
-    grid = subfactor_cfg.get("grid", [])
-    value = metrics.get(metric_code)
 
-    if not grid:
-        raise ConfigError(
-            f"Subfactor '{subfactor_cfg['id']}' has no grid defined"
-        )
-
-    # Check special cases (override grid)
-    special_cases = subfactor_cfg.get("special_cases", [])
-    for case in special_cases:
-        when = case.get("when", {})
-        match = True
-        for key, expected in when.items():
-            if key == "total_debt":
-                match = match and metrics.get("total_debt") == expected
-            elif key == "total_debt_gt_0":
-                match = match and (metrics.get("total_debt", 0) > 0) == bool(expected)
-            elif key == "ebitda_lt_0":
-                match = match and (metrics.get("ebitda", 0) < 0) == bool(expected)
-            elif key == "ebitda_lte_0":
-                match = match and (metrics.get("ebitda", 0) <= 0) == bool(expected)
-            elif key == "ebit_lt_0":
-                match = match and (metrics.get("ebit", 0) < 0) == bool(expected)
-            elif key == "ebit_lte_0":
-                match = match and (metrics.get("ebit", 0) <= 0) == bool(expected)
-            elif key == "debt_ebitda_lt_0":
-                match = (
-                    match
-                    and (metrics.get("debt_ebitda_x", 0) < 0) == bool(expected)
-                )
-            elif key == "debt_lt_0":
-                match = match and (metrics.get("total_debt", 0) < 0) == bool(expected)
-            elif key == "net_debt_lt_0":
-                match = match and (metrics.get("net_debt", 0) < 0) == bool(expected)
-            elif key == "rcf_gt_0":
-                match = match and (metrics.get("rcf", 0) > 0) == bool(expected)
-            elif key == "rcf_lt_0":
-                match = match and (metrics.get("rcf", 0) < 0) == bool(expected)
-            elif key == "rcf_lte_0":
-                match = match and (metrics.get("rcf", 0) <= 0) == bool(expected)
-            elif key == "debt_book_cap_lt_0":
-                match = (
-                    match
-                    and (metrics.get("debt_book_cap_pct", 0) < 0)
-                    == bool(expected)
-                )
-            elif key == "interest_expense_lte_0":
-                match = match and (metrics.get("interest_expense", 0) <= 0) == bool(expected)
-            elif key == "interest_expense_gt_0":
-                match = match and (metrics.get("interest_expense", 0) > 0) == bool(expected)
-            else:
-                match = False
-            if not match:
-                break
-
-        if match:
-            if "numeric_score" in case:
-                score = float(case["numeric_score"])
-                band = str(case.get("band", "SPECIAL"))
-            else:
-                score = float(case["score"])
-                band = str(case["band"])
-            return {
-                "methodology_id": methodology_cfg["id"],
-                "factor_id": factor_cfg["id"],
-                "factor_name": factor_cfg["name"],
-                "factor_weight_pct": float(factor_cfg["weight_pct"]),
-                "subfactor_id": subfactor_cfg["id"],
-                "subfactor_name": subfactor_cfg["name"],
-                "subfactor_weight_pct": float(subfactor_cfg["weight_pct"]),
-                "metric_code": metric_code,
-                "direction": direction,
-                "input_value": value,
-                "score": score,
-                "band": band,
-            }
-
-    # Decide numeric vs qualitative by presence of min/max in rows
-    is_numeric = any(("min" in row or "max" in row) for row in grid)
-
-    if direction == "qualitative" or not is_numeric:
-        score, band = _score_qualitative_grid(grid, value)
-    else:
-        if value is None:
-            raise MetricError(
-                f"Missing numeric metric '{metric_code}' "
-                f"for subfactor '{subfactor_cfg['id']}'"
-            )
-
-        score, band = _score_numeric_grid(grid, float(value), direction)
-
+def _build_subfactor_result(methodology_cfg: Dict[str, Any], factor_cfg: Dict[str, Any],
+                             subfactor_cfg: Dict[str, Any], metric_code: str, direction: str,
+                             value: Any, score: float, band: str) -> Dict[str, Any]:
+    """Build the subfactor result dictionary."""
     return {
         "methodology_id": methodology_cfg["id"],
         "factor_id": factor_cfg["id"],
@@ -277,6 +219,108 @@ def _score_subfactor(
         "score": score,
         "band": band,
     }
+
+
+def _score_subfactor(
+    methodology_cfg: Dict[str, Any],
+    factor_cfg: Dict[str, Any],
+    subfactor_cfg: Dict[str, Any],
+    metrics: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Compute the score for a single subfactor given metrics.
+    """
+    metric_code = subfactor_cfg["metric"]
+    direction = subfactor_cfg.get("direction", "higher_better")
+    grid = subfactor_cfg.get("grid", [])
+    value = metrics.get(metric_code)
+
+    if not grid:
+        raise ConfigError(f"Subfactor '{subfactor_cfg['id']}' has no grid defined")
+
+    special_cases = subfactor_cfg.get("special_cases", [])
+    for case in special_cases:
+        if _check_special_case(case, metrics):
+            score = float(case.get("numeric_score") or case.get("score"))
+            band = str(case.get("band", "SPECIAL"))
+            return _build_subfactor_result(
+                methodology_cfg, factor_cfg, subfactor_cfg, metric_code,
+                direction, value, score, band
+            )
+
+    is_numeric = any(("min" in row or "max" in row) for row in grid)
+
+    if direction == "qualitative" or not is_numeric:
+        score, band = _score_qualitative_grid(grid, value)
+    else:
+        if value is None:
+            raise MetricError(
+                f"Missing numeric metric '{metric_code}' for subfactor '{subfactor_cfg['id']}'"
+            )
+        score, band = _score_numeric_grid(grid, float(value), direction)
+
+    return _build_subfactor_result(
+        methodology_cfg, factor_cfg, subfactor_cfg, metric_code,
+        direction, value, score, band
+    )
+
+
+def _should_skip_factor(normalize_quantitative: bool, sub_cfgs: List[Dict[str, Any]]) -> bool:
+    """Check if a factor should be skipped in quantitative-only mode."""
+    if not normalize_quantitative:
+        return False
+    return all(
+        sf.get("direction") == "qualitative"
+        or not any(("min" in row or "max" in row) for row in sf.get("grid", []))
+        for sf in sub_cfgs
+    )
+
+
+def _should_skip_subfactor(normalize_quantitative: bool, sf_cfg: Dict[str, Any], metrics: Dict[str, Any]) -> bool:
+    """Check if a subfactor should be skipped in quantitative-only mode."""
+    if not normalize_quantitative:
+        return False
+    sf_direction = sf_cfg.get("direction", "")
+    sf_grid = sf_cfg.get("grid", [])
+    is_qual_sf = sf_direction == "qualitative" or not any(
+        ("min" in row or "max" in row) for row in sf_grid
+    )
+    metric_key = sf_cfg.get("metric", "")
+    return is_qual_sf and metrics.get(metric_key) is None
+
+
+def _score_all_subfactors(cfg: Dict[str, Any], factor_cfg: Dict[str, Any],
+                          sub_cfgs: List[Dict[str, Any]], metrics: Dict[str, Any],
+                          normalize_quantitative: bool, skip_metrics: set) -> tuple:
+    """Score all subfactors and accumulate weights/scores."""
+    subfactor_scores = []
+    sf_weight_total = 0.0
+    sf_weighted_score_sum = 0.0
+
+    for sf_cfg in sub_cfgs:
+        if sf_cfg.get("metric") in skip_metrics:
+            continue
+        if _should_skip_subfactor(normalize_quantitative, sf_cfg, metrics):
+            continue
+
+        sf_result = _score_subfactor(cfg, factor_cfg, sf_cfg, metrics)
+        subfactor_scores.append(sf_result)
+
+        w = float(sf_result["subfactor_weight_pct"])
+        sf_weight_total += w
+        sf_weighted_score_sum += sf_result["score"] * w
+
+    return subfactor_scores, sf_weight_total, sf_weighted_score_sum
+
+
+def _map_score_to_rating(score_to_rating: List[Dict[str, Any]], composite_score: float) -> Optional[str]:
+    """Map composite score to rating using score_to_rating table."""
+    for row in score_to_rating:
+        min_s = float(row["min_score"])
+        max_s = float(row["max_score"])
+        if composite_score >= min_s and composite_score < max_s:
+            return str(row["rating"])
+    return None
 
 
 def score_company(
@@ -298,7 +342,6 @@ def score_company(
       - factor_scores: list of dicts
       - subfactor_scores: list of dicts
     """
-
     cfg = load_methodology(methodology_id, config_dir=config_dir)
     factors_cfg = cfg["factors"]
     score_to_rating = cfg["score_to_rating"]
@@ -306,7 +349,6 @@ def score_company(
     subfactor_scores: List[Dict[str, Any]] = []
     factor_scores: List[Dict[str, Any]] = []
 
-    # 1) Score each subfactor
     skip_metrics = skip_metrics or set()
     for factor_cfg in factors_cfg:
         factor_id = factor_cfg["id"]
@@ -317,83 +359,40 @@ def score_company(
         if not sub_cfgs:
             raise ConfigError(f"Factor '{factor_id}' has no subfactors")
 
-        if normalize_quantitative:
-            is_qualitative_factor = all(
-                sf.get("direction") == "qualitative"
-                or not any(("min" in row or "max" in row) for row in sf.get("grid", []))
-                for sf in sub_cfgs
-            )
-            if is_qualitative_factor:
-                # Skip qualitative-only factors and reweight remaining factors to 100%
-                continue
+        if _should_skip_factor(normalize_quantitative, sub_cfgs):
+            continue
 
-        sf_weight_total = 0.0
-        sf_weighted_score_sum = 0.0
-
-        for sf_cfg in sub_cfgs:
-            if sf_cfg.get("metric") in skip_metrics:
-                continue
-
-            # In quant_only mode, skip individual qualitative subfactors within mixed factors
-            if normalize_quantitative:
-                sf_direction = sf_cfg.get("direction", "")
-                sf_grid = sf_cfg.get("grid", [])
-                is_qual_sf = sf_direction == "qualitative" or not any(
-                    ("min" in row or "max" in row) for row in sf_grid
-                )
-                metric_key = sf_cfg.get("metric", "")
-                metric_val = metrics.get(metric_key)
-                if is_qual_sf and metric_val is None:
-                    continue
-
-            sf_result = _score_subfactor(cfg, factor_cfg, sf_cfg, metrics)
-            subfactor_scores.append(sf_result)
-
-            w = float(sf_result["subfactor_weight_pct"])
-            sf_weight_total += w
-            sf_weighted_score_sum += sf_result["score"] * w
+        sfs, sf_weight_total, sf_weighted_score_sum = _score_all_subfactors(
+            cfg, factor_cfg, sub_cfgs, metrics, normalize_quantitative, skip_metrics
+        )
+        subfactor_scores.extend(sfs)
 
         if sf_weight_total <= 0:
-            raise ConfigError(
-                f"Subfactor weights in factor '{factor_id}' sum to zero"
-            )
+            raise ConfigError(f"Subfactor weights in factor '{factor_id}' sum to zero")
 
         factor_score = sf_weighted_score_sum / sf_weight_total
-        factor_scores.append(
-            {
-                "factor_id": factor_id,
-                "factor_name": factor_name,
-                "factor_weight_pct": factor_weight,
-                "score": factor_score,
-            }
-        )
+        factor_scores.append({
+            "factor_id": factor_id,
+            "factor_name": factor_name,
+            "factor_weight_pct": factor_weight,
+            "score": factor_score,
+        })
 
-    # 2) Composite score (weighted by factor weight_pct)
     total_factor_weight = sum(f["factor_weight_pct"] for f in factor_scores)
     if total_factor_weight <= 0:
         raise ConfigError("Total factor weight <= 0; check config")
 
     if normalize_quantitative:
         for f in factor_scores:
-            f["weight_pct_adjusted"] = (
-                f["factor_weight_pct"] / total_factor_weight * 100.0
-            )
+            f["weight_pct_adjusted"] = f["factor_weight_pct"] / total_factor_weight * 100.0
 
     composite_score = (
-        sum(f["score"] * f["factor_weight_pct"] for f in factor_scores)
-        / total_factor_weight
+        sum(f["score"] * f["factor_weight_pct"] for f in factor_scores) / total_factor_weight
     )
 
-    # 3) Map composite score to rating
-    anchor_rating: Optional[str] = None
-    for row in score_to_rating:
-        min_s = float(row["min_score"])
-        max_s = float(row["max_score"])
-        if composite_score >= min_s and composite_score < max_s:
-            anchor_rating = str(row["rating"])
-            break
+    anchor_rating = _map_score_to_rating(score_to_rating, composite_score)
 
-    result = {
+    return {
         "methodology_id": cfg["id"],
         "methodology_name": cfg["name"],
         "composite_score": composite_score,
@@ -401,4 +400,3 @@ def score_company(
         "factor_scores": factor_scores,
         "subfactor_scores": subfactor_scores,
     }
-    return result

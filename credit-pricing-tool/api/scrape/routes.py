@@ -255,6 +255,68 @@ def get_banks_summary():
 # ─── Wholesale Rates (BKBM, Swap) ────────────────────────────────────────────
 
 
+def _try_live_scrape() -> tuple:
+    """Attempt live BKBM/swap scrape, returning rates and success flag."""
+    warnings = []
+    latest_rates = []
+    live_scrape_ok = False
+    try:
+        latest_rates = scrape_bkbm_swap_rates()
+        if latest_rates:
+            live_scrape_ok = True
+        else:
+            warnings.append("Live RBNZ scrape returned no data (Cloudflare 403). Using stored data from Supabase.")
+    except Exception as scrape_err:
+        warnings.append(f"Live RBNZ scrape failed: {str(scrape_err)}. Using stored data from Supabase.")
+    return latest_rates, live_scrape_ok, warnings
+
+
+def _build_rate_chart(history: List[Dict], rate_type_key: str) -> dict:
+    """Build chart-friendly format from rate history by date."""
+    by_date = {}
+    for r in history:
+        date = r["date"][:10] if r.get("date") else r.get("scraped_at", "")[:10]
+        if date not in by_date:
+            by_date[date] = {"date": date}
+        by_date[date][r["tenor"]] = r["rate_pct"]
+    return sorted(by_date.values(), key=lambda x: x["date"])
+
+
+def _populate_missing_swap_rates(latest_swap: List[Dict], swap_chart: List[Dict]) -> None:
+    """Populate latest swap rates from history if live scrape returned nothing."""
+    if not latest_swap and swap_chart:
+        last_entry = swap_chart[-1]
+        for tenor, rate in last_entry.items():
+            if tenor != "date" and isinstance(rate, (int, float)):
+                latest_swap.append({
+                    "rate_name": f"Swap {tenor}",
+                    "rate_pct": rate,
+                    "tenor": tenor,
+                    "rate_type": "swap",
+                    "source": "Supabase (browser-scraped from interest.co.nz)",
+                })
+
+
+def _populate_missing_bkbm_rates(latest_bkbm: List[Dict], bkbm_chart: List[Dict]) -> None:
+    """Populate latest BKBM rates from history if live scrape returned nothing."""
+    if not latest_bkbm and bkbm_chart:
+        seen_tenors = {}
+        for entry in reversed(bkbm_chart):
+            for tenor, rate in entry.items():
+                if tenor != "date" and isinstance(rate, (int, float)) and tenor not in seen_tenors:
+                    seen_tenors[tenor] = rate
+            if len(seen_tenors) >= 10:
+                break
+        for tenor, rate in seen_tenors.items():
+            latest_bkbm.append({
+                "rate_name": f"{tenor}",
+                "rate_pct": rate,
+                "tenor": tenor,
+                "rate_type": "bkbm",
+                "source": "Supabase (browser-scraped from interest.co.nz)",
+            })
+
+
 @router.get("/rates/wholesale")
 def get_wholesale_rates(
     history_days: int = Query(0, description="Number of days of history (0 = all)")
@@ -265,78 +327,20 @@ def get_wholesale_rates(
     Returns current rates + time series history from the database.
     """
     try:
-        warnings = []
+        latest_rates, live_scrape_ok, warnings = _try_live_scrape()
 
-        # Try live scrape — report clearly if it fails
-        latest_rates = []
-        live_scrape_ok = False
-        try:
-            latest_rates = scrape_bkbm_swap_rates()
-            if latest_rates:
-                live_scrape_ok = True
-            else:
-                warnings.append("Live RBNZ scrape returned no data (Cloudflare 403). Using stored data from Supabase.")
-        except Exception as scrape_err:
-            warnings.append(f"Live RBNZ scrape failed: {str(scrape_err)}. Using stored data from Supabase.")
-
-        # Get history from database (primary data source — browser-scraped)
         bkbm_history = get_wholesale_history("bkbm", history_days)
         swap_history = get_wholesale_history("swap", history_days)
 
-        # Build chart-friendly format from DB history
-        bkbm_by_date = {}
-        for r in bkbm_history:
-            date = r["date"][:10] if r.get("date") else r.get("scraped_at", "")[:10]
-            if date not in bkbm_by_date:
-                bkbm_by_date[date] = {"date": date}
-            bkbm_by_date[date][r["tenor"]] = r["rate_pct"]
+        bkbm_chart = _build_rate_chart(bkbm_history, "bkbm")
+        swap_chart = _build_rate_chart(swap_history, "swap")
 
-        swap_by_date = {}
-        for r in swap_history:
-            date = r["date"][:10] if r.get("date") else r.get("scraped_at", "")[:10]
-            if date not in swap_by_date:
-                swap_by_date[date] = {"date": date}
-            swap_by_date[date][r["tenor"]] = r["rate_pct"]
-
-        # Sort by date
-        bkbm_chart = sorted(bkbm_by_date.values(), key=lambda x: x["date"])
-        swap_chart = sorted(swap_by_date.values(), key=lambda x: x["date"])
-
-        # Categorise latest rates from live scrape
         latest_bkbm = [r for r in latest_rates if r.get("rate_type") == "bkbm"]
         latest_swap = [r for r in latest_rates if r.get("rate_type") == "swap"]
 
-        # If live scrape failed, pull latest from DB history and tag source clearly
         data_source = "live_scrape" if live_scrape_ok else "supabase_stored"
-        if not latest_swap and swap_chart:
-            last_entry = swap_chart[-1]
-            for tenor, rate in last_entry.items():
-                if tenor != "date" and isinstance(rate, (int, float)):
-                    latest_swap.append({
-                        "rate_name": f"Swap {tenor}",
-                        "rate_pct": rate,
-                        "tenor": tenor,
-                        "rate_type": "swap",
-                        "source": "Supabase (browser-scraped from interest.co.nz)",
-                    })
-
-        if not latest_bkbm and bkbm_chart:
-            # Pull the most recent value for EACH tenor (not just from one date)
-            seen_tenors = {}
-            for entry in reversed(bkbm_chart):
-                for tenor, rate in entry.items():
-                    if tenor != "date" and isinstance(rate, (int, float)) and tenor not in seen_tenors:
-                        seen_tenors[tenor] = rate
-                if len(seen_tenors) >= 10:  # sanity limit
-                    break
-            for tenor, rate in seen_tenors.items():
-                latest_bkbm.append({
-                    "rate_name": f"{tenor}",
-                    "rate_pct": rate,
-                    "tenor": tenor,
-                    "rate_type": "bkbm",
-                    "source": "Supabase (browser-scraped from interest.co.nz)",
-                })
+        _populate_missing_swap_rates(latest_swap, swap_chart)
+        _populate_missing_bkbm_rates(latest_bkbm, bkbm_chart)
 
         return {
             "latest_rates": latest_swap + latest_bkbm,

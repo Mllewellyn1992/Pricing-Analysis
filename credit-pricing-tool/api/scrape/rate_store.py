@@ -186,96 +186,68 @@ def _save_to_json(scrape_result: Dict[str, Any]) -> bool:
 # ─── Read Operations ─────────────────────────────────────────────────────────
 
 
+def _fetch_latest_products(client) -> tuple:
+    """Fetch latest product rates from Supabase. Returns (latest_ts, products_list)."""
+    resp = (client.table("rate_snapshots")
+            .select("scraped_at").order("scraped_at", desc=True).limit(1).execute())
+    if not resp.data:
+        return None, []
+
+    latest_ts = resp.data[0]["scraped_at"]
+    products_resp = (client.table("rate_snapshots")
+                     .select("*").eq("scraped_at", latest_ts).execute())
+
+    products = [
+        {"bank": r["bank"], "product_name": r["product_name"],
+         "rate_pct": float(r["rate_pct"]), "rate_type": r.get("rate_type", ""),
+         "category": r.get("category", ""), "source_url": r.get("source_url", ""),
+         "scraped_at": r["scraped_at"]}
+        for r in (products_resp.data or [])
+    ]
+    return latest_ts, products
+
+
+def _fetch_latest_ocr(client) -> Optional[Dict[str, Any]]:
+    """Fetch latest OCR rate from Supabase."""
+    resp = (client.table("ocr_snapshots")
+            .select("*").order("scraped_at", desc=True).limit(1).execute())
+    if not resp.data:
+        return None
+    o = resp.data[0]
+    return {"rate_name": "Official Cash Rate (OCR)", "rate_pct": float(o["rate_pct"]),
+            "decision_date": o.get("decision_date", ""), "source": o.get("source", ""),
+            "scraped_at": o["scraped_at"]}
+
+
+def _fetch_latest_wholesale(client) -> List[Dict[str, Any]]:
+    """Fetch latest wholesale rates from Supabase."""
+    resp = (client.table("wholesale_rate_snapshots")
+            .select("*").order("scraped_at", desc=True).limit(20).execute())
+    return [
+        {"rate_name": r["rate_name"], "rate_pct": float(r["rate_pct"]),
+         "tenor": r["tenor"], "rate_type": r["rate_type"],
+         "date": r.get("rate_date", ""), "source": r.get("source", "")}
+        for r in (resp.data or [])
+    ]
+
+
 def get_latest_snapshot() -> Optional[Dict[str, Any]]:
     """Get the most recent scrape snapshot (products + OCR + wholesale)."""
     client = _get_supabase()
 
     if client:
         try:
-            # Get latest products (most recent scraped_at)
-            resp = (
-                client.table("rate_snapshots")
-                .select("scraped_at")
-                .order("scraped_at", desc=True)
-                .limit(1)
-                .execute()
-            )
-            if not resp.data:
+            latest_ts, products = _fetch_latest_products(client)
+            if not latest_ts:
                 return None
-
-            latest_ts = resp.data[0]["scraped_at"]
-
-            # Get all products from that scrape
-            products_resp = (
-                client.table("rate_snapshots")
-                .select("*")
-                .eq("scraped_at", latest_ts)
-                .execute()
-            )
-
-            # Get latest OCR
-            ocr_resp = (
-                client.table("ocr_snapshots")
-                .select("*")
-                .order("scraped_at", desc=True)
-                .limit(1)
-                .execute()
-            )
-
-            # Get latest wholesale rates
-            wholesale_resp = (
-                client.table("wholesale_rate_snapshots")
-                .select("*")
-                .order("scraped_at", desc=True)
-                .limit(20)
-                .execute()
-            )
-
-            products = [
-                {
-                    "bank": r["bank"],
-                    "product_name": r["product_name"],
-                    "rate_pct": float(r["rate_pct"]),
-                    "rate_type": r.get("rate_type", ""),
-                    "category": r.get("category", ""),
-                    "source_url": r.get("source_url", ""),
-                    "scraped_at": r["scraped_at"],
-                }
-                for r in (products_resp.data or [])
-            ]
-
-            ocr = None
-            if ocr_resp.data:
-                o = ocr_resp.data[0]
-                ocr = {
-                    "rate_name": "Official Cash Rate (OCR)",
-                    "rate_pct": float(o["rate_pct"]),
-                    "decision_date": o.get("decision_date", ""),
-                    "source": o.get("source", ""),
-                    "scraped_at": o["scraped_at"],
-                }
-
-            wholesale = [
-                {
-                    "rate_name": r["rate_name"],
-                    "rate_pct": float(r["rate_pct"]),
-                    "tenor": r["tenor"],
-                    "rate_type": r["rate_type"],
-                    "date": r.get("rate_date", ""),
-                    "source": r.get("source", ""),
-                }
-                for r in (wholesale_resp.data or [])
-            ]
-
             return {
                 "scraped_at": latest_ts,
                 "products": products,
-                "ocr": ocr,
-                "bkbm_swap_rates": wholesale,
+                "ocr": _fetch_latest_ocr(client),
+                "bkbm_swap_rates": _fetch_latest_wholesale(client),
                 "banks_scraped": sorted(set(p["bank"] for p in products)),
                 "product_count": len(products),
             }
-
         except Exception as e:
             logger.error(f"Failed to read latest snapshot from Supabase: {e}")
             return None

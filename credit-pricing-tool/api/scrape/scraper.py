@@ -93,182 +93,161 @@ def scrape_interest_co_nz() -> Optional[List[Dict[str, Any]]]:
         return None
 
 
-def _parse_html_table(html: str) -> Optional[List[Dict[str, Any]]]:
-    """
-    Parse HTML content to extract bank rates from interest.co.nz.
+# Known NZ banks we care about
+_KNOWN_BANKS = {"ANZ", "ASB", "BNZ", "Westpac", "Kiwibank"}
 
-    The table structure on interest.co.nz has:
-    - Columns: Institution | Product | Type | Security | Base rate % pa | ...
-    - First row for a bank has the bank name in the Institution column
-    - Continuation rows (additional products) have an EMPTY Institution cell
-    - Each bank may have multiple products (corporate, working capital, overdraft, etc.)
+# Product name -> category mapping (checked in order, first match wins)
+_PRODUCT_CATEGORIES = [
+    ("corporate indicator", "corporate"),
+    ("corporate", "corporate"),
+    ("working capital", "working_capital"),
+    ("business lending base", "working_capital"),
+    ("business overdraft", "overdraft"),
+    ("overdraft", "overdraft"),
+    ("rural", "rural"),
+    ("home equity", "other"),
+]
 
-    We classify products into categories based on product name keywords:
-    - Corporate: "corporate indicator", "corporate"
-    - Working Capital: "working capital", "business lending base"
-    - Overdraft: "overdraft", "business overdraft"
-    - Rural: "rural" (stored separately)
-    - Other: anything else (e.g., "home equity")
 
-    For each bank, we pick the best rate for corporate and working_capital tiers.
+def _classify_product(product_name: str) -> str:
+    """Classify a product name into a rate category."""
+    lower = product_name.lower()
+    for keyword, category in _PRODUCT_CATEGORIES:
+        if keyword in lower:
+            return category
+    return "other"
 
-    Args:
-        html: Raw HTML content
+
+def _strip_tags(text: str) -> str:
+    """Remove HTML tags and decode entities."""
+    text = re.sub(r"<[^>]+>", "", text)
+    text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    text = text.replace("&nbsp;", " ").replace("&#39;", "'").replace("&quot;", '"')
+    return text.strip()
+
+
+def _extract_bank_products(html: str) -> Dict[str, List[Dict[str, Any]]]:
+    """Parse HTML rows and extract per-bank product lists.
 
     Returns:
-        List of bank rate dicts or None if parsing fails
+        Dict mapping bank name -> list of {product, category, rate} dicts
     """
-    # Known NZ banks we care about
-    KNOWN_BANKS = {"ANZ", "ASB", "BNZ", "Westpac", "Kiwibank"}
+    rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.DOTALL | re.IGNORECASE)
+    if not rows:
+        logger.warning("No table rows found in HTML")
+        return {}
 
-    # Product name -> category mapping (checked in order, first match wins)
-    PRODUCT_CATEGORIES = [
-        ("corporate indicator", "corporate"),
-        ("corporate", "corporate"),
-        ("working capital", "working_capital"),
-        ("business lending base", "working_capital"),
-        ("business overdraft", "overdraft"),
-        ("overdraft", "overdraft"),
-        ("rural", "rural"),
-        ("home equity", "other"),
-    ]
+    current_bank = None
+    bank_products: Dict[str, List[Dict[str, Any]]] = {}
 
-    def _classify_product(product_name: str) -> str:
-        """Classify a product name into a rate category."""
-        lower = product_name.lower()
-        for keyword, category in PRODUCT_CATEGORIES:
-            if keyword in lower:
-                return category
-        return "other"
+    for row_html in rows:
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", row_html, re.DOTALL | re.IGNORECASE)
+        if len(cells) < 5:
+            continue
 
-    def _strip_tags(text: str) -> str:
-        """Remove HTML tags and decode entities."""
-        text = re.sub(r"<[^>]+>", "", text)
-        text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-        text = text.replace("&nbsp;", " ").replace("&#39;", "'").replace("&quot;", '"')
-        return text.strip()
+        institution_text = _strip_tags(cells[0])
+        product_text = _strip_tags(cells[1])
+        rate_text = _strip_tags(cells[4])
+        rate_match = re.search(r"([0-9]+\.?[0-9]*)", rate_text)
 
+        if not rate_match:
+            continue
+
+        base_rate = float(rate_match.group(1))
+        if not (1.0 <= base_rate <= 20.0):
+            continue
+
+        # Determine which bank this row belongs to
+        if institution_text:
+            matched_bank = None
+            for bank in _KNOWN_BANKS:
+                if bank.lower() in institution_text.lower():
+                    matched_bank = bank
+                    break
+            if matched_bank:
+                current_bank = matched_bank
+            elif institution_text.strip():
+                current_bank = None
+                continue
+
+        if current_bank is None:
+            continue
+
+        category = _classify_product(product_text)
+        if current_bank not in bank_products:
+            bank_products[current_bank] = []
+
+        bank_products[current_bank].append({
+            "product": product_text,
+            "category": category,
+            "rate": base_rate,
+        })
+        logger.debug(f"Parsed: {current_bank} | {product_text} | {category} | {base_rate}%")
+
+    return bank_products
+
+
+def _aggregate_bank_rates(bank_products: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    """Build final rate entries per bank from raw product lists.
+
+    Groups products by category and picks the best (lowest) rate for each tier.
+
+    Returns:
+        List of bank rate dicts with corporate_rate, working_capital_rate, etc.
+    """
+    rates = []
+    for bank, products in bank_products.items():
+        entry: Dict[str, Any] = {"bank": bank}
+
+        by_category: Dict[str, List[float]] = {}
+        for p in products:
+            cat = p["category"]
+            if cat not in by_category:
+                by_category[cat] = []
+            by_category[cat].append(p["rate"])
+
+        if "corporate" in by_category:
+            entry["corporate_rate"] = min(by_category["corporate"])
+        if "working_capital" in by_category:
+            entry["working_capital_rate"] = min(by_category["working_capital"])
+        if "overdraft" in by_category:
+            entry["overdraft_rate"] = min(by_category["overdraft"])
+
+        # Fallback: use overdraft as working_capital if nothing else
+        if "working_capital_rate" not in entry and "overdraft_rate" in entry:
+            entry["working_capital_rate"] = entry["overdraft_rate"]
+
+        entry["products"] = [
+            {"name": p["product"], "category": p["category"], "rate": p["rate"]}
+            for p in products
+        ]
+
+        rates.append(entry)
+        logger.info(
+            f"{bank}: corporate={entry.get('corporate_rate', 'N/A')}, "
+            f"working_capital={entry.get('working_capital_rate', 'N/A')}, "
+            f"overdraft={entry.get('overdraft_rate', 'N/A')}"
+        )
+
+    return rates
+
+
+def _parse_html_table(html: str) -> Optional[List[Dict[str, Any]]]:
+    """Parse HTML content to extract bank rates from interest.co.nz.
+
+    Delegates to _extract_bank_products for row parsing and
+    _aggregate_bank_rates for building the final rate structure.
+
+    Returns:
+        List of bank rate dicts or None if parsing fails.
+    """
     try:
-        # Extract all <tr> rows from the HTML
-        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.DOTALL | re.IGNORECASE)
-
-        if not rows:
-            logger.warning("No table rows found in HTML")
-            return None
-
-        # Parse each row into cells, tracking current bank
-        current_bank = None
-        bank_products: Dict[str, List[Dict[str, Any]]] = {}  # bank -> list of {product, category, rate}
-
-        for row_html in rows:
-            # Extract all <td> cells from this row
-            cells = re.findall(r"<td[^>]*>(.*?)</td>", row_html, re.DOTALL | re.IGNORECASE)
-
-            if len(cells) < 5:
-                # Not a data row (header, spacer, etc.)
-                continue
-
-            # Cell 0 = Institution, Cell 1 = Product, Cell 4 = Base rate % pa
-            institution_text = _strip_tags(cells[0])
-            product_text = _strip_tags(cells[1])
-
-            # Extract base rate from cell 4 (the "Base rate % pa" column)
-            rate_text = _strip_tags(cells[4])
-            rate_match = re.search(r"([0-9]+\.?[0-9]*)", rate_text)
-
-            if not rate_match:
-                continue
-
-            base_rate = float(rate_match.group(1))
-
-            # Validate rate is in reasonable range (1-20%)
-            if not (1.0 <= base_rate <= 20.0):
-                continue
-
-            # Determine which bank this row belongs to
-            if institution_text:
-                # Check if this is one of our known banks
-                matched_bank = None
-                for bank in KNOWN_BANKS:
-                    if bank.lower() in institution_text.lower():
-                        matched_bank = bank
-                        break
-                if matched_bank:
-                    current_bank = matched_bank
-                elif institution_text.strip():
-                    # Some other institution we don't track — skip
-                    current_bank = None
-                    continue
-            # If institution_text is empty, this is a continuation row for current_bank
-
-            if current_bank is None:
-                continue
-
-            # Classify the product
-            category = _classify_product(product_text)
-
-            if current_bank not in bank_products:
-                bank_products[current_bank] = []
-
-            bank_products[current_bank].append({
-                "product": product_text,
-                "category": category,
-                "rate": base_rate,
-            })
-
-            logger.debug(
-                f"Parsed: {current_bank} | {product_text} | {category} | {base_rate}%"
-            )
-
+        bank_products = _extract_bank_products(html)
         if not bank_products:
             logger.warning("No bank products extracted from HTML")
             return None
 
-        # Build final rate entries per bank
-        rates = []
-        for bank, products in bank_products.items():
-            entry: Dict[str, Any] = {"bank": bank}
-
-            # Group by category and pick best rate for each
-            by_category: Dict[str, List[float]] = {}
-            for p in products:
-                cat = p["category"]
-                if cat not in by_category:
-                    by_category[cat] = []
-                by_category[cat].append(p["rate"])
-
-            # Corporate rate: prefer "corporate", lowest if multiple
-            if "corporate" in by_category:
-                entry["corporate_rate"] = min(by_category["corporate"])
-
-            # Working capital rate: prefer "working_capital"
-            if "working_capital" in by_category:
-                entry["working_capital_rate"] = min(by_category["working_capital"])
-
-            # Overdraft rate
-            if "overdraft" in by_category:
-                entry["overdraft_rate"] = min(by_category["overdraft"])
-
-            # If a bank only has overdraft (like BNZ/Westpac), use it as working_capital too
-            if "working_capital_rate" not in entry and "overdraft_rate" in entry:
-                entry["working_capital_rate"] = entry["overdraft_rate"]
-
-            # If a bank has no corporate rate, try to infer from other products
-            # (some banks might not have a dedicated corporate indicator rate)
-
-            # Store all products for transparency
-            entry["products"] = [
-                {"name": p["product"], "category": p["category"], "rate": p["rate"]}
-                for p in products
-            ]
-
-            rates.append(entry)
-            logger.info(
-                f"{bank}: corporate={entry.get('corporate_rate', 'N/A')}, "
-                f"working_capital={entry.get('working_capital_rate', 'N/A')}, "
-                f"overdraft={entry.get('overdraft_rate', 'N/A')}"
-            )
-
+        rates = _aggregate_bank_rates(bank_products)
         return rates if rates else None
 
     except Exception as e:

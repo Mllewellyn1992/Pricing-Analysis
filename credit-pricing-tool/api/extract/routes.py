@@ -113,126 +113,112 @@ def extract_business_description(raw_text: str) -> Optional[str]:
     return raw_text[:300].strip() if raw_text else None
 
 
-@router.post("/extract/pdf", response_model=ExtractionResponse)
-async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
-    """
-    Extract financial data from a PDF financial statement.
-
-    Process:
-    1. Accepts multipart PDF file upload
-    2. Extracts text using pdfplumber
-    3. Extracts tables from document
-    4. Uses Claude API to identify financial fields (or heuristic fallback)
-    5. Extracts business description from document text
-    6. Classifies sector using AI based on business description
-    7. Returns structured data with confidence scores + sector classification
-    """
+async def _save_upload_to_temp(file: UploadFile) -> tuple:
+    """Validate and save upload to a temp file. Returns (temp_path, file_size_mb)."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="File must have a filename")
-
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="File must be a PDF")
 
+    content = await file.read()
+    file_size_mb = len(content) / (1024 * 1024)
+    if file_size_mb > 50:
+        raise HTTPException(
+            status_code=413,
+            detail=f"PDF too large ({file_size_mb:.1f}MB). Maximum is 50MB."
+        )
+
+    temp_fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+    os.write(temp_fd, content)
+    os.close(temp_fd)
+    del content
+    gc.collect()
+    return temp_path, file_size_mb
+
+
+def _extract_text_and_tables(temp_path: str) -> tuple:
+    """Run text and table extraction on the PDF. Returns (raw_text, tables)."""
+    try:
+        raw_text = extract_text_from_pdf(temp_path)
+        logger.debug(f"Extracted {len(raw_text)} characters of text")
+        gc.collect()
+    except Exception as e:
+        logger.error(f"Text extraction failed: {e}")
+        raise HTTPException(status_code=422, detail=f"Failed to extract text from PDF: {str(e)}")
+
+    try:
+        tables = extract_tables_from_pdf(temp_path)
+        logger.debug(f"Extracted {len(tables)} tables")
+        gc.collect()
+    except Exception as e:
+        logger.warning(f"Table extraction failed: {e}")
+        tables = []
+
+    return raw_text, tables
+
+
+def _map_fields(raw_text: str, tables: list) -> Dict[str, Any]:
+    """Map financial fields using AI with heuristic fallback."""
+    try:
+        result = map_financials_with_ai(raw_text, tables)
+        if result.get("method") == "ai" and not result.get("fields"):
+            logger.info("AI extraction returned no fields, trying heuristic")
+            result = map_financials_heuristic(raw_text, tables)
+    except Exception as e:
+        logger.warning(f"Financial field extraction failed: {e}")
+        result = map_financials_heuristic(raw_text, tables)
+    return result
+
+
+def _classify_document_sector(raw_text: str, business_description: Optional[str]) -> Optional[SectorClassification]:
+    """Classify the document's sector using AI with heuristic fallback."""
+    try:
+        classify_text = business_description or raw_text[:500]
+        if not classify_text:
+            return None
+        result = classify_sector_with_ai(classify_text)
+        if result.get("confidence", 0) < 0.4:
+            result = classify_sector_heuristic(classify_text)
+        sc = SectorClassification(**result)
+        logger.info(f"Sector classified: S&P={sc.sp_sector}, confidence={sc.confidence}")
+        return sc
+    except Exception as e:
+        logger.warning(f"Sector classification failed: {e}")
+        return None
+
+
+@router.post("/extract/pdf", response_model=ExtractionResponse)
+async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
+    """Extract financial data from a PDF financial statement."""
     temp_path = None
     try:
-        # Save uploaded file to temp location
-        content = await file.read()
-
-        # Reject very large files (>50MB) to prevent OOM
-        file_size_mb = len(content) / (1024 * 1024)
-        if file_size_mb > 50:
-            raise HTTPException(
-                status_code=413,
-                detail=f"PDF too large ({file_size_mb:.1f}MB). Maximum is 50MB."
-            )
-
-        temp_fd, temp_path = tempfile.mkstemp(suffix=".pdf")
-        os.write(temp_fd, content)
-        os.close(temp_fd)
-        del content  # Free upload buffer immediately
-        gc.collect()
-
+        temp_path, file_size_mb = await _save_upload_to_temp(file)
         logger.info(f"Extracting financial data from: {file.filename} ({file_size_mb:.1f}MB)")
 
-        # Extract text from PDF
-        try:
-            raw_text = extract_text_from_pdf(temp_path)
-            logger.debug(f"Extracted {len(raw_text)} characters of text")
-            gc.collect()  # Free OCR image buffers
-        except Exception as e:
-            logger.error(f"Text extraction failed: {e}")
-            raise HTTPException(
-                status_code=422,
-                detail=f"Failed to extract text from PDF: {str(e)}"
-            )
-
-        # Extract tables from PDF
-        try:
-            tables = extract_tables_from_pdf(temp_path)
-            logger.debug(f"Extracted {len(tables)} tables")
-            gc.collect()
-        except Exception as e:
-            logger.warning(f"Table extraction failed: {e}")
-            tables = []
-
-        # Map financial fields
-        try:
-            extraction_result = map_financials_with_ai(raw_text, tables)
-            if extraction_result.get("method") == "ai" and not extraction_result.get("fields"):
-                logger.info("AI extraction returned no fields, trying heuristic")
-                extraction_result = map_financials_heuristic(raw_text, tables)
-        except Exception as e:
-            logger.warning(f"Financial field extraction failed: {e}")
-            extraction_result = map_financials_heuristic(raw_text, tables)
+        raw_text, tables = _extract_text_and_tables(temp_path)
+        extraction_result = _map_fields(raw_text, tables)
 
         extracted_fields = extraction_result.get("fields", {})
         confidence_scores = extraction_result.get("confidence", {})
-        extraction_method = extraction_result.get("method", "unknown")
-        currency = extraction_result.get("currency", "UNKNOWN")
-        fiscal_period = extraction_result.get("fiscal_period", "UNKNOWN")
+        logger.info(f"Extraction complete: {len(extracted_fields)} fields via {extraction_result.get('method')}")
 
-        logger.info(
-            f"Extraction complete: {len(extracted_fields)} fields extracted "
-            f"using {extraction_method} method"
-        )
-
-        # Extract business description from PDF text
         business_description = None
         try:
             business_description = extract_business_description(raw_text)
-            if business_description:
-                logger.info(f"Extracted business description ({len(business_description)} chars)")
         except Exception as e:
             logger.warning(f"Business description extraction failed: {e}")
 
-        # Classify sector based on business description + raw text context
-        sector_classification = None
-        try:
-            # Use business description if found, otherwise use first 500 chars of raw text
-            classify_text = business_description or raw_text[:500]
-            if classify_text:
-                result = classify_sector_with_ai(classify_text)
-                if result.get("confidence", 0) < 0.4:
-                    result = classify_sector_heuristic(classify_text)
-                sector_classification = SectorClassification(**result)
-                logger.info(
-                    f"Sector classified: S&P={sector_classification.sp_sector}, "
-                    f"confidence={sector_classification.confidence}"
-                )
-        except Exception as e:
-            logger.warning(f"Sector classification failed: {e}")
-
-        raw_text_preview = raw_text[:500] if raw_text else ""
+        sector_classification = _classify_document_sector(raw_text, business_description)
 
         return ExtractionResponse(
             status="success",
             filename=file.filename,
             extracted_fields=extracted_fields,
             confidence_scores=confidence_scores,
-            raw_text_preview=raw_text_preview,
-            extraction_method=extraction_method,
-            currency=currency,
-            fiscal_period=fiscal_period,
+            raw_text_preview=raw_text[:500] if raw_text else "",
+            extraction_method=extraction_result.get("method", "unknown"),
+            currency=extraction_result.get("currency", "UNKNOWN"),
+            fiscal_period=extraction_result.get("fiscal_period", "UNKNOWN"),
             message=f"Successfully extracted {len(extracted_fields)} financial fields from {file.filename}",
             business_description=business_description,
             sector_classification=sector_classification,
@@ -242,10 +228,7 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
         raise
     except Exception as e:
         logger.error(f"Unexpected error during extraction: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Extraction failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
     finally:
         if temp_path and os.path.exists(temp_path):
             try:

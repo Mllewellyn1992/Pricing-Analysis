@@ -61,6 +61,26 @@ SP_SECTORS = {
     "footwear",
     "lodging_and_casinos",
     "restaurants",
+    "unregulated_power_and_gas",
+    # Additional sectors from frontend/S&P defaults
+    "agribusiness_commodity_foods_and_agricultural_cooperatives",
+    "asset_managers",
+    "auto_suppliers",
+    "commodity_chemicals",
+    "specialty_chemicals",
+    "consumer_staples_and_branded_nondurables",
+    "contract_drilling",
+    "financial_market_infrastructure",
+    "financial_services_finance_companies",
+    "health_care_equipment",
+    "leisure_and_sports",
+    "metals_production_and_processing",
+    "oilfield_services_and_equipment",
+    "railroad_package_express_and_logistics",
+    "refining_and_marketing",
+    "technology_hardware_and_semiconductors",
+    "transportation_cyclical",
+    "transportation_infrastructure",
 }
 
 # Moody's sector taxonomy
@@ -195,6 +215,76 @@ KEYWORD_MAPPINGS = {
 }
 
 
+def _build_sector_prompt(business_description: str) -> str:
+    """Build the Claude API prompt for sector classification."""
+    sp_sectors_str = ", ".join(sorted(SP_SECTORS))
+    moodys_sectors_str = ", ".join(sorted(MOODYS_SECTORS))
+
+    return f"""You are a financial sector classification expert with deep knowledge of S&P and Moody's rating frameworks.
+
+Given the following company business description, classify the company into appropriate sectors for both S&P and Moody's.
+
+BUSINESS DESCRIPTION:
+{business_description}
+
+S&P SECTORS (choose one):
+{sp_sectors_str}
+
+MOODY'S SECTORS (choose one):
+{moodys_sectors_str}
+
+RESPONSE:
+Return ONLY a valid JSON object with this exact structure (no other text):
+{{
+  "sp_sector": "exact_sector_name_from_list",
+  "moodys_sector": "exact_sector_name_from_list",
+  "confidence": 0.0_to_1.0,
+  "reasoning": "Brief explanation of why you chose these sectors"
+}}
+
+CONFIDENCE SCORING:
+- 0.95+: Clear classification, unambiguous business model
+- 0.80-0.94: Strong signal but some diversification
+- 0.60-0.79: Reasonable classification with some ambiguity
+- 0.40-0.59: Low confidence, diversified/unclear
+- Below 0.40: Not confident, return null instead
+
+RULES:
+1. Must choose from provided sector lists exactly
+2. Use exact sector names from lists
+3. Must be valid JSON
+4. Confidence must be between 0 and 1
+"""
+
+
+def _validate_sector_result(result: dict, business_description: str) -> Optional[dict]:
+    """Validate sectors and confidence from API result."""
+    sp = result.get("sp_sector", "").strip()
+    moodys = result.get("moodys_sector", "").strip()
+
+    if sp not in SP_SECTORS:
+        logger.warning(f"Invalid S&P sector from API: {sp}")
+        sp = None
+    if moodys not in MOODYS_SECTORS:
+        logger.warning(f"Invalid Moody's sector from API: {moodys}")
+        moodys = None
+
+    if not sp or not moodys:
+        logger.warning("API returned invalid sectors, falling back to heuristic")
+        return None
+
+    confidence = float(result.get("confidence", 0.5))
+    confidence = max(0.0, min(1.0, confidence))
+
+    return {
+        "sp_sector": sp,
+        "moodys_sector": moodys,
+        "confidence": confidence,
+        "reasoning": result.get("reasoning", ""),
+        "method": "ai",
+    }
+
+
 def classify_sector_with_ai(
     business_description: str,
     api_key: Optional[str] = None,
@@ -232,59 +322,18 @@ def classify_sector_with_ai(
         return classify_sector_heuristic(business_description)
 
     client = anthropic.Anthropic(api_key=api_key)
-
-    sp_sectors_str = ", ".join(sorted(SP_SECTORS))
-    moodys_sectors_str = ", ".join(sorted(MOODYS_SECTORS))
-
-    prompt = f"""You are a financial sector classification expert with deep knowledge of S&P and Moody's rating frameworks.
-
-Given the following company business description, classify the company into appropriate sectors for both S&P and Moody's.
-
-BUSINESS DESCRIPTION:
-{business_description}
-
-S&P SECTORS (choose one):
-{sp_sectors_str}
-
-MOODY'S SECTORS (choose one):
-{moodys_sectors_str}
-
-RESPONSE:
-Return ONLY a valid JSON object with this exact structure (no other text):
-{{
-  "sp_sector": "exact_sector_name_from_list",
-  "moodys_sector": "exact_sector_name_from_list",
-  "confidence": 0.0_to_1.0,
-  "reasoning": "Brief explanation of why you chose these sectors"
-}}
-
-CONFIDENCE SCORING:
-- 0.95+: Clear classification, unambiguous business model
-- 0.80-0.94: Strong signal but some diversification
-- 0.60-0.79: Reasonable classification with some ambiguity
-- 0.40-0.59: Low confidence, diversified/unclear
-- Below 0.40: Not confident, return null instead
-
-RULES:
-1. Must choose from provided sector lists exactly
-2. Use exact sector names from lists
-3. Must be valid JSON
-4. Confidence must be between 0 and 1
-"""
+    prompt = _build_sector_prompt(business_description)
 
     try:
         logger.debug("Calling Claude API for sector classification")
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=512,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "user", "content": prompt}]
         )
 
         response_text = response.content[0].text
 
-        # Parse JSON response
         json_str = response_text
         if "```json" in json_str:
             json_str = json_str.split("```json")[1].split("```")[0]
@@ -292,32 +341,10 @@ RULES:
             json_str = json_str.split("```")[1].split("```")[0]
 
         result = json.loads(json_str.strip())
-
-        # Validate sectors
-        sp = result.get("sp_sector", "").strip()
-        moodys = result.get("moodys_sector", "").strip()
-
-        if sp not in SP_SECTORS:
-            logger.warning(f"Invalid S&P sector from API: {sp}")
-            sp = None
-        if moodys not in MOODYS_SECTORS:
-            logger.warning(f"Invalid Moody's sector from API: {moodys}")
-            moodys = None
-
-        if not sp or not moodys:
-            logger.warning("API returned invalid sectors, falling back to heuristic")
-            return classify_sector_heuristic(business_description)
-
-        confidence = float(result.get("confidence", 0.5))
-        confidence = max(0.0, min(1.0, confidence))
-
-        return {
-            "sp_sector": sp,
-            "moodys_sector": moodys,
-            "confidence": confidence,
-            "reasoning": result.get("reasoning", ""),
-            "method": "ai",
-        }
+        validated = _validate_sector_result(result, business_description)
+        if validated:
+            return validated
+        return classify_sector_heuristic(business_description)
 
     except Exception as e:
         logger.error(f"Sector classification API call failed: {e}")
