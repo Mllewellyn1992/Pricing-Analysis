@@ -20,6 +20,7 @@ OCR pipeline:
 
 import os
 import re
+import gc
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 
@@ -300,9 +301,189 @@ def _postprocess_table(columns, rows):
 # TEXT EXTRACTION
 # ══════════════════════════════════════════════════════════════════════════════
 
+# Page-level quality thresholds
+_CID_THRESHOLD = 10          # More than this many (cid: refs = garbled page
+_MIN_PAGE_CHARS = 30         # Fewer chars than this = empty/image page
+_MULTICOLUMN_RATIO = 0.25    # If >25% of lines are duplicated headers, likely multi-column
+
+# Memory management constants
+_DEFAULT_DPI = 150            # Reduced from 300 — still good for OCR, uses ~75% less RAM
+_MAX_OCR_PAGES = 20           # Never OCR more than this many pages (prevent OOM)
+_MAX_PDF_PAGES = 80           # Skip extraction entirely for very large PDFs
+
+
+def _page_is_garbled(text: str) -> bool:
+    """Check if page text is garbled (CID-encoded fonts or mostly non-printable)."""
+    if not text or len(text.strip()) < _MIN_PAGE_CHARS:
+        return True
+    cid_count = text.count("(cid:")
+    if cid_count > _CID_THRESHOLD:
+        return True
+    # Check ratio of printable alphanumeric to total chars
+    alpha_chars = sum(1 for c in text if c.isalnum() or c in " .,;:$%()\n-")
+    if len(text) > 0 and alpha_chars / len(text) < 0.5:
+        return True
+    return False
+
+
+def _page_is_multicolumn(text: str) -> bool:
+    """Detect multi-column layout artifacts from pdfplumber extraction.
+
+    Common signs:
+    - Header text repeated/mirrored (e.g. "BFG ANNUAL REPORT 2024/ ... BFG ANNUAL REPORT 2024/")
+    - Two sets of column headers on one page (e.g. two "2024  2023" blocks)
+    - Lines with interleaved data from two different statements
+    """
+    if not text or len(text) < 200:
+        return False
+
+    lines = text.split("\n")
+    if len(lines) < 5:
+        return False
+
+    # Check for duplicated header patterns in first few lines
+    # e.g. "BFG ANNUAL REPORT 2024/ CONSOLIDATED ... BFG ANNUAL REPORT 2024/ CONSOLIDATED"
+    for line in lines[:5]:
+        # Find if same substantial phrase appears twice in a line
+        words = line.split()
+        if len(words) >= 10:
+            half = len(words) // 2
+            first_half = " ".join(words[:half])
+            second_half = " ".join(words[half:])
+            # Check if they share significant overlap
+            first_words = set(first_half.lower().split())
+            second_words = set(second_half.lower().split())
+            if len(first_words) >= 4 and len(first_words & second_words) / len(first_words) > 0.5:
+                return True
+
+    # Check for two sets of year column headers (e.g. "2024  2023" appearing twice)
+    year_header_count = 0
+    for line in lines[:15]:
+        years = re.findall(r"\b20\d{2}\b", line)
+        if len(years) >= 2:
+            year_header_count += 1
+    if year_header_count >= 2:
+        return True
+
+    return False
+
+
+# Keywords indicating a page contains primary financial statements (not notes)
+_FINANCIAL_STATEMENT_KEYWORDS = [
+    "statement of comprehensive income",
+    "statement of financial position",
+    "statement of cash flows",
+    "statement of changes in equity",
+    "balance sheet",
+    "profit and loss",
+    "profit or loss",
+]
+
+
+def _page_has_financial_statements(text: str) -> bool:
+    """Check if page contains a primary financial statement (not just notes).
+
+    We only column-OCR pages with actual financial statements since those
+    have critical numeric data that gets garbled by column merging. Notes
+    pages are still usable from pdfplumber even with multi-column artifacts.
+    """
+    text_lower = text.lower()
+    return any(kw in text_lower for kw in _FINANCIAL_STATEMENT_KEYWORDS)
+
+
+def _ocr_single_page(pdf_path: str, page_num: int, dpi: int = _DEFAULT_DPI) -> str:
+    """OCR a single page from the PDF. page_num is 1-indexed."""
+    from pdf2image import convert_from_path
+    import pytesseract
+
+    try:
+        images = convert_from_path(
+            pdf_path,
+            dpi=dpi,
+            grayscale=True,
+            thread_count=1,
+            fmt="jpeg",
+            first_page=page_num,
+            last_page=page_num,
+        )
+        if not images:
+            return ""
+        try:
+            text = pytesseract.image_to_string(
+                images[0], lang="eng", config="--psm 6"
+            )
+            return text or ""
+        finally:
+            images[0].close()
+            del images
+            gc.collect()
+    except Exception as e:
+        logger.warning(f"OCR failed on page {page_num}: {e}")
+        return ""
+
+
+def _ocr_page_columns(pdf_path: str, page_num: int, dpi: int = _DEFAULT_DPI) -> str:
+    """OCR a multi-column page by splitting into left and right halves.
+
+    This handles the common NZ annual report layout where two pages of content
+    are rendered side-by-side on a single landscape-oriented page.
+    Each half is OCR'd independently to avoid column merging.
+    """
+    from pdf2image import convert_from_path
+    import pytesseract
+    from PIL import Image
+
+    try:
+        images = convert_from_path(
+            pdf_path,
+            dpi=dpi,
+            grayscale=True,
+            thread_count=1,
+            fmt="jpeg",
+            first_page=page_num,
+            last_page=page_num,
+        )
+        if not images:
+            return ""
+
+        img = images[0]
+        width, height = img.size
+
+        try:
+            # Split into left and right halves
+            left_img = img.crop((0, 0, width // 2, height))
+            right_img = img.crop((width // 2, 0, width, height))
+
+            left_text = pytesseract.image_to_string(
+                left_img, lang="eng", config="--psm 6"
+            )
+            right_text = pytesseract.image_to_string(
+                right_img, lang="eng", config="--psm 6"
+            )
+
+            left_img.close()
+            right_img.close()
+
+            # Combine with clear separator
+            parts = []
+            if left_text and left_text.strip():
+                parts.append(left_text.strip())
+            if right_text and right_text.strip():
+                parts.append(right_text.strip())
+
+            return "\n".join(parts)
+        finally:
+            img.close()
+            del images
+            gc.collect()
+
+    except Exception as e:
+        logger.warning(f"Column OCR failed on page {page_num}: {e}")
+        return ""
+
 
 def _extract_text_with_pdfplumber(pdf_path: str) -> str:
-    """Extract text from PDF using pdfplumber."""
+    """Extract text from PDF using pdfplumber (simple, no per-page logic)."""
     import pdfplumber
 
     text_parts = []
@@ -315,59 +496,126 @@ def _extract_text_with_pdfplumber(pdf_path: str) -> str:
     return "\n".join(text_parts)
 
 
-def _extract_text_with_ocr(pdf_path: str, dpi: int = 300) -> str:
-    """
-    Extract text from PDF using OCR (pytesseract + pdf2image).
+def _extract_text_hybrid(pdf_path: str, dpi: int = _DEFAULT_DPI) -> str:
+    """Smart per-page hybrid extraction: pdfplumber + targeted OCR.
 
-    Converts each page to a high-DPI image, then runs Tesseract OCR.
-    This handles scanned/image-based PDFs that pdfplumber can't read.
+    For each page:
+    1. Try pdfplumber text extraction
+    2. If text is garbled (CID fonts) or empty → OCR that page
+    3. If text has multi-column artifacts → OCR with column splitting
+    4. Otherwise keep pdfplumber text (faster, higher quality for clean PDFs)
+
+    Memory-conscious: limits OCR pages, uses lower DPI, garbage collects.
+    """
+    import pdfplumber
+
+    has_ocr = _has_library("pytesseract") and _has_library("pdf2image")
+
+    text_parts = []
+    ocr_pages = 0
+    column_ocr_pages = 0
+    pdfplumber_pages = 0
+
+    with pdfplumber.open(pdf_path) as pdf:
+        total_pages = len(pdf.pages)
+        logger.info(f"Hybrid extraction: {total_pages} pages, OCR available: {has_ocr}")
+
+        # Cap total pages to prevent OOM on massive PDFs
+        pages_to_process = min(total_pages, _MAX_PDF_PAGES)
+        if pages_to_process < total_pages:
+            logger.warning(f"PDF has {total_pages} pages, limiting to {pages_to_process}")
+
+        for i in range(pages_to_process):
+            page = pdf.pages[i]
+            page_num = i + 1  # 1-indexed for pdf2image
+
+            try:
+                text = page.extract_text() or ""
+            except Exception as e:
+                logger.warning(f"pdfplumber failed on page {page_num}: {e}")
+                text = ""
+
+            # Decision: is this page good enough from pdfplumber?
+            if _page_is_garbled(text):
+                # Page is empty or garbled — needs OCR
+                if has_ocr and (ocr_pages + column_ocr_pages) < _MAX_OCR_PAGES:
+                    logger.debug(f"Page {page_num}: garbled/empty, using OCR")
+                    ocr_text = _ocr_single_page(pdf_path, page_num, dpi)
+                    if ocr_text and ocr_text.strip():
+                        text_parts.append(ocr_text)
+                        ocr_pages += 1
+                    else:
+                        logger.debug(f"Page {page_num}: OCR also returned nothing")
+                else:
+                    # No OCR available or OCR budget exhausted
+                    if text.strip():
+                        text_parts.append(text)
+            elif _page_is_multicolumn(text):
+                if has_ocr and _page_has_financial_statements(text) and (ocr_pages + column_ocr_pages) < _MAX_OCR_PAGES:
+                    logger.debug(f"Page {page_num}: multi-column financial statement, using column OCR")
+                    col_text = _ocr_page_columns(pdf_path, page_num, dpi)
+                    if col_text and col_text.strip():
+                        text_parts.append(col_text)
+                        column_ocr_pages += 1
+                    else:
+                        text_parts.append(text)
+                        pdfplumber_pages += 1
+                else:
+                    text_parts.append(text)
+                    pdfplumber_pages += 1
+            else:
+                # Page is clean — use pdfplumber text
+                if text.strip():
+                    text_parts.append(text)
+                    pdfplumber_pages += 1
+
+            # Periodic gc for long PDFs
+            if page_num % 20 == 0:
+                gc.collect()
+
+    logger.info(
+        f"Hybrid extraction complete: {pdfplumber_pages} pdfplumber, "
+        f"{ocr_pages} OCR, {column_ocr_pages} column-OCR pages"
+    )
+    return "\n".join(text_parts)
+
+
+def _extract_text_with_ocr(pdf_path: str, dpi: int = _DEFAULT_DPI) -> str:
+    """
+    Extract text from PDF using OCR, PAGE BY PAGE to limit memory.
+
+    Converts one page at a time (not all at once) to avoid OOM on large PDFs.
+    Limits to _MAX_OCR_PAGES pages max.
 
     Args:
         pdf_path: Path to the PDF file
-        dpi: Resolution for page rendering (higher = better OCR but slower/more RAM)
-             Using 300 for good quality while staying within RAM limits.
+        dpi: Resolution for page rendering (lower = less RAM)
     """
-    from pdf2image import convert_from_path
     import pytesseract
 
-    logger.info(f"Running OCR on {pdf_path} at {dpi} DPI")
+    logger.info(f"Running full OCR on {pdf_path} at {dpi} DPI (page-by-page, max {_MAX_OCR_PAGES} pages)")
 
+    # Get page count first
+    try:
+        import pdfplumber
+        with pdfplumber.open(pdf_path) as pdf:
+            total_pages = len(pdf.pages)
+    except Exception:
+        total_pages = _MAX_OCR_PAGES  # Guess if we can't count
+
+    pages_to_ocr = min(total_pages, _MAX_OCR_PAGES)
     text_parts = []
 
-    try:
-        # Convert PDF pages to images
-        # Use thread_count=1 and grayscale=True to minimize RAM usage
-        images = convert_from_path(
-            pdf_path,
-            dpi=dpi,
-            grayscale=True,
-            thread_count=1,
-            fmt="jpeg",
-        )
+    for page_num in range(1, pages_to_ocr + 1):
+        try:
+            page_text = _ocr_single_page(pdf_path, page_num, dpi)
+            if page_text and page_text.strip():
+                text_parts.append(page_text)
+                logger.debug(f"OCR page {page_num}: {len(page_text)} chars")
+        except Exception as e:
+            logger.warning(f"OCR failed on page {page_num}: {e}")
 
-        for i, image in enumerate(images):
-            try:
-                # Run OCR on each page
-                page_text = pytesseract.image_to_string(
-                    image,
-                    lang="eng",
-                    config="--psm 6",  # Assume uniform block of text
-                )
-                if page_text and page_text.strip():
-                    text_parts.append(page_text)
-                    logger.debug(f"OCR page {i+1}: {len(page_text)} chars")
-            except Exception as e:
-                logger.warning(f"OCR failed on page {i+1}: {e}")
-            finally:
-                # Free image memory immediately
-                image.close()
-
-        logger.info(f"OCR extracted {sum(len(t) for t in text_parts)} total chars from {len(images)} pages")
-
-    except Exception as e:
-        logger.error(f"pdf2image conversion failed: {e}")
-        raise
-
+    logger.info(f"OCR extracted {sum(len(t) for t in text_parts)} total chars from {pages_to_ocr} pages")
     return "\n".join(text_parts)
 
 
@@ -443,15 +691,16 @@ def _text_quality_score(text: str) -> float:
 
 def extract_text_from_pdf(pdf_path: str) -> str:
     """
-    Extract text from PDF with intelligent fallback strategy.
+    Extract text from PDF with intelligent per-page fallback strategy.
 
     Priority:
-    1. pdfplumber - lightweight, reliable for text-based PDFs
-    2. pytesseract OCR - handles scanned/image PDFs
-    3. PyPDF2 - basic fallback
-
-    If pdfplumber returns low-quality text (common for scanned PDFs where
-    it might get garbled text or nothing), automatically falls back to OCR.
+    1. Hybrid extraction (pdfplumber per-page + targeted OCR for bad pages)
+       - Uses pdfplumber for clean pages (fast, high quality)
+       - OCRs garbled/empty pages (CID fonts, image-based pages)
+       - Column-splits and OCRs multi-column layout pages
+    2. Full OCR (for fully scanned/image PDFs where hybrid still fails)
+    3. Plain pdfplumber (if OCR is not available)
+    4. PyPDF2 (last resort)
     """
     if not os.path.exists(pdf_path):
         raise FileNotFoundError(f"PDF file not found: {pdf_path}")
@@ -460,49 +709,42 @@ def extract_text_from_pdf(pdf_path: str) -> str:
     best_score = 0.0
     best_method = "none"
 
-    # Try pdfplumber first (lightweight, reliable for text-based PDFs)
+    # Try hybrid extraction first (pdfplumber + targeted OCR)
     if _has_library("pdfplumber"):
         try:
-            logger.debug(f"Attempting pdfplumber extraction for {pdf_path}")
-            text = _extract_text_with_pdfplumber(pdf_path)
+            logger.debug(f"Attempting hybrid extraction for {pdf_path}")
+            text = _extract_text_hybrid(pdf_path)
             score = _text_quality_score(text)
-            logger.info(f"pdfplumber: {len(text)} chars, quality={score:.2f}")
+            logger.info(f"hybrid: {len(text)} chars, quality={score:.2f}")
 
             if score > best_score:
                 best_text = text
                 best_score = score
-                best_method = "pdfplumber"
+                best_method = "hybrid"
 
-            # If quality is high enough, skip OCR (saves time and RAM)
+            # If quality is high enough, we're done
             if score >= 0.6:
-                logger.info(f"pdfplumber quality sufficient ({score:.2f}), skipping OCR")
+                logger.info(f"Hybrid quality sufficient ({score:.2f})")
                 return best_text
 
         except Exception as e:
-            logger.debug(f"pdfplumber extraction failed: {e}")
+            logger.warning(f"Hybrid extraction failed: {e}")
 
-    # Try OCR if pdfplumber didn't produce good results
-    if _has_library("pytesseract") and _has_library("pdf2image"):
+    # Try full OCR if hybrid didn't produce good results
+    if best_score < 0.5 and _has_library("pytesseract") and _has_library("pdf2image"):
         try:
-            logger.info("pdfplumber quality insufficient, attempting OCR extraction")
+            logger.info("Hybrid quality insufficient, attempting full OCR extraction")
             text = _extract_text_with_ocr(pdf_path)
             score = _text_quality_score(text)
-            logger.info(f"OCR: {len(text)} chars, quality={score:.2f}")
+            logger.info(f"Full OCR: {len(text)} chars, quality={score:.2f}")
 
             if score > best_score:
                 best_text = text
                 best_score = score
-                best_method = "ocr"
-
-                # If OCR is also low quality but pdfplumber had some text,
-                # combine them for the best result
-                if best_method == "ocr" and best_score < 0.4 and best_text:
-                    logger.info("Combining pdfplumber and OCR text for best result")
+                best_method = "full_ocr"
 
         except Exception as e:
-            logger.warning(f"OCR extraction failed: {e}")
-    else:
-        logger.info("pytesseract/pdf2image not available, skipping OCR")
+            logger.warning(f"Full OCR extraction failed: {e}")
 
     # Try PyPDF2 as last resort
     if best_score < 0.3 and _has_library("PyPDF2"):

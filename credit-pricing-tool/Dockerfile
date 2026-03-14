@@ -48,4 +48,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 ENV PORT=8000
 
 # Run the application
-CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT}"]
+# --workers 1: single worker to minimize memory footprint
+# --timeout-keep-alive 30: free idle connections sooner
+# --limit-max-requests 100: restart worker after 100 requests to prevent memory leaks
+CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT} --workers 1 --timeout-keep-alive 30 --limit-max-requests 100"]

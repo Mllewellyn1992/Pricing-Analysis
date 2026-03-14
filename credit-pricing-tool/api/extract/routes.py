@@ -6,6 +6,7 @@ POST /api/classify-sector - Sector classification
 
 import os
 import re
+import gc
 import tempfile
 import logging
 from typing import Dict, Any, Optional, List
@@ -136,16 +137,28 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
     try:
         # Save uploaded file to temp location
         content = await file.read()
+
+        # Reject very large files (>50MB) to prevent OOM
+        file_size_mb = len(content) / (1024 * 1024)
+        if file_size_mb > 50:
+            raise HTTPException(
+                status_code=413,
+                detail=f"PDF too large ({file_size_mb:.1f}MB). Maximum is 50MB."
+            )
+
         temp_fd, temp_path = tempfile.mkstemp(suffix=".pdf")
         os.write(temp_fd, content)
         os.close(temp_fd)
+        del content  # Free upload buffer immediately
+        gc.collect()
 
-        logger.info(f"Extracting financial data from: {file.filename}")
+        logger.info(f"Extracting financial data from: {file.filename} ({file_size_mb:.1f}MB)")
 
         # Extract text from PDF
         try:
             raw_text = extract_text_from_pdf(temp_path)
             logger.debug(f"Extracted {len(raw_text)} characters of text")
+            gc.collect()  # Free OCR image buffers
         except Exception as e:
             logger.error(f"Text extraction failed: {e}")
             raise HTTPException(
@@ -157,6 +170,7 @@ async def extract_pdf(file: UploadFile = File(...)) -> ExtractionResponse:
         try:
             tables = extract_tables_from_pdf(temp_path)
             logger.debug(f"Extracted {len(tables)} tables")
+            gc.collect()
         except Exception as e:
             logger.warning(f"Table extraction failed: {e}")
             tables = []
