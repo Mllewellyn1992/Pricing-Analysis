@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { analyzeFinancials, getAllProducts, uploadPDF } from '../api'
+import { analyzeFinancials, getAllProducts, uploadPDF, pingServer } from '../api'
 
 const EXTRACTION_TO_FORM = {
   revenue_mn: 'revenue', ebit_mn: 'ebit', depreciation_mn: 'depreciation',
@@ -141,9 +141,17 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
 
   const handleUpload = async (file) => {
     if (!file.name.toLowerCase().endsWith('.pdf')) { setUploadError('PDF files only'); return }
-    setUploadError(null); setUploadStatus('extracting'); setUploadFile(file.name)
+    setUploadError(null); setUploadStatus('warming_up'); setUploadFile(file.name)
     try {
-      const result = await uploadPDF(file)
+      // Ping server first to wake it up (Render cold start)
+      const alive = await pingServer()
+      if (!alive) {
+        // Server is cold — wait a bit and ping again
+        await new Promise(r => setTimeout(r, 3000))
+        await pingServer()
+      }
+      setUploadStatus('extracting')
+      const result = await uploadPDF(file, (status) => setUploadStatus(status))
       applyExtraction(result, file.name)
       setUploadStatus('done')
     } catch (e) { setUploadStatus('error'); setUploadError(e.message) }
@@ -238,19 +246,19 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
         onDragLeave={e => { e.preventDefault(); setIsDrag(false) }}
         onDragOver={e => e.preventDefault()}
         onDrop={e => { e.preventDefault(); setIsDrag(false); e.dataTransfer.files[0] && handleUpload(e.dataTransfer.files[0]) }}
-        onClick={() => uploadStatus !== 'extracting' && fileRef.current?.click()}
+        onClick={() => !['extracting','warming_up','retrying'].includes(uploadStatus) && fileRef.current?.click()}
         className={`mb-3 px-3 py-2.5 rounded-md cursor-pointer transition-all border ${
           isDrag ? 'border-blue-400 bg-blue-50'
           : uploadStatus === 'done' ? 'border-emerald-300 bg-emerald-50/60'
           : uploadStatus === 'error' ? 'border-red-300 bg-red-50/60'
-          : uploadStatus === 'extracting' ? 'border-blue-300 bg-blue-50/60'
+          : ['extracting','warming_up','retrying'].includes(uploadStatus) ? 'border-blue-300 bg-blue-50/60'
           : 'border-dashed border-slate-300 hover:border-blue-300 hover:bg-slate-50'
         }`}
       >
         <input ref={fileRef} type="file" accept=".pdf" onChange={e => e.target.files[0] && handleUpload(e.target.files[0])} className="hidden" />
         <div className="flex items-center gap-3">
           <div className="flex-shrink-0">
-            {uploadStatus === 'extracting' ? (
+            {['extracting','warming_up','retrying'].includes(uploadStatus) ? (
               <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full" />
             ) : uploadStatus === 'done' ? (
               <svg className="w-5 h-5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
@@ -261,7 +269,11 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            {uploadStatus === 'extracting' ? (
+            {uploadStatus === 'warming_up' ? (
+              <p className="text-xs text-blue-700">Connecting to server<span className="animate-pulse">...</span></p>
+            ) : uploadStatus === 'retrying' ? (
+              <p className="text-xs text-amber-700">Server was slow — retrying extraction<span className="animate-pulse">...</span></p>
+            ) : uploadStatus === 'extracting' ? (
               <p className="text-xs text-blue-700">Extracting from <span className="font-medium">{uploadFile}</span> — 30-60 seconds...</p>
             ) : uploadStatus === 'done' ? (
               <p className="text-xs text-emerald-700">
@@ -286,9 +298,10 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
             </div>
           )}
         </div>
-        {uploadStatus === 'extracting' && (
+        {['extracting','warming_up','retrying'].includes(uploadStatus) && (
           <div className="mt-2 w-full bg-blue-200 rounded-full h-1">
-            <div className="h-1 rounded-full bg-blue-500 animate-pulse" style={{ width: '66%' }} />
+            <div className={`h-1 rounded-full animate-pulse ${uploadStatus === 'retrying' ? 'bg-amber-500' : 'bg-blue-500'}`}
+              style={{ width: uploadStatus === 'warming_up' ? '20%' : uploadStatus === 'retrying' ? '40%' : '66%' }} />
           </div>
         )}
       </div>

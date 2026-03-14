@@ -161,38 +161,82 @@ export async function getBaseRates() {
 }
 
 /**
- * Upload a PDF and extract financial data.
+ * Wake up the server (Render free tier cold start).
+ * Returns true if the server is alive.
  */
-export async function uploadPDF(file) {
+export async function pingServer() {
   try {
-    const formData = new FormData()
-    formData.append('file', file)
+    const controller = new AbortController()
+    setTimeout(() => controller.abort(), 5000)
+    const res = await fetch(`${API_BASE}/api/rates/ocr`, { signal: controller.signal })
+    return res.ok
+  } catch { return false }
+}
 
-    const response = await fetch(`${API_BASE}/api/extract/pdf`, {
-      method: 'POST',
-      body: formData,
-    })
+/**
+ * Upload a PDF and extract financial data.
+ * Includes retry logic for Render cold-start failures.
+ * @param {File} file
+ * @param {function} onStatus - Optional callback for status updates ('warming_up', 'extracting', 'retrying')
+ */
+export async function uploadPDF(file, onStatus) {
+  const MAX_RETRIES = 2
+  const TIMEOUT_MS = 180000 // 3 minutes — extraction + Claude API can be slow
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      throw new Error(err.detail || `API error: ${response.statusText}`)
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 0) {
+        onStatus?.('retrying')
+        // Wait before retry (exponential backoff: 3s, 6s)
+        await new Promise(r => setTimeout(r, 3000 * attempt))
+      }
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
+
+      const response = await fetch(`${API_BASE}/api/extract/pdf`, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.detail || `API error: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+
+      return {
+        fileName: file.name,
+        status: data.status || 'success',
+        extractionMethod: data.extraction_method,
+        data: data.extracted_fields || {},
+        confidenceScores: data.confidence_scores || {},
+        rawTextPreview: data.raw_text_preview || '',
+        businessDescription: data.business_description || null,
+        sectorClassification: data.sector_classification || null,
+      }
+    } catch (error) {
+      const isLastAttempt = attempt === MAX_RETRIES
+      const isRetryable = error.name === 'AbortError' ||
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('NetworkError') ||
+        error.message.includes('API error:')
+
+      if (isLastAttempt || !isRetryable) {
+        console.error('Error uploading PDF:', error)
+        if (error.name === 'AbortError') {
+          throw new Error('Request timed out. The server may be starting up — please try again in a moment.')
+        }
+        throw error
+      }
+      // Otherwise, loop continues to retry
     }
-
-    const data = await response.json()
-
-    return {
-      fileName: file.name,
-      status: data.status || 'success',
-      extractionMethod: data.extraction_method,
-      data: data.extracted_fields || {},
-      confidenceScores: data.confidence_scores || {},
-      rawTextPreview: data.raw_text_preview || '',
-      businessDescription: data.business_description || null,
-      sectorClassification: data.sector_classification || null,
-    }
-  } catch (error) {
-    console.error('Error uploading PDF:', error)
-    throw error
   }
 }
 
