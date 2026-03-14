@@ -632,13 +632,18 @@ def _extract_text_hybrid(pdf_path: str, dpi: int = _DEFAULT_DPI) -> str:
     pdfplumber_pages = 0
 
     # Phase 1: Fast extraction with PyPDF2
+    reader = None
     try:
         from PyPDF2 import PdfReader
         reader = PdfReader(pdf_path)
         total_pages = len(reader.pages)
+    except ImportError:
+        logger.info("PyPDF2 not installed, using pdfplumber for all pages")
     except Exception as e:
-        logger.warning(f"PyPDF2 failed to open PDF: {e}, falling back to pdfplumber-only")
-        reader = None
+        logger.warning(f"PyPDF2 failed to open PDF: {e}")
+
+    if reader is None:
+        # Fallback: use pdfplumber for everything
         import pdfplumber as _pb
         with _pb.open(pdf_path) as pdf:
             total_pages = len(pdf.pages)
