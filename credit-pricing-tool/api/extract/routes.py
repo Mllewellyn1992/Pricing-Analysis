@@ -38,9 +38,9 @@ _CACHE_MAX_SIZE = 20  # Keep last 20 extractions
 # ── Operation timeout constants ──────────────────────────────────────────────
 _TEXT_EXTRACTION_TIMEOUT = 120   # 2 minutes for text extraction (incl. OCR)
 _TABLE_EXTRACTION_TIMEOUT = 60   # 1 minute for table extraction
-_AI_MAPPING_TIMEOUT = 60         # 1 minute for Claude financial mapping
+_AI_MAPPING_TIMEOUT = 180        # 3 minutes for Claude financial mapping (90s/call × 2 retries)
 _SECTOR_TIMEOUT = 30             # 30 seconds for sector classification
-_TOTAL_REQUEST_TIMEOUT = 210     # 3.5 minutes absolute max per request
+_TOTAL_REQUEST_TIMEOUT = 300     # 5 minutes absolute max per request
 
 
 class SectorClassification(BaseModel):

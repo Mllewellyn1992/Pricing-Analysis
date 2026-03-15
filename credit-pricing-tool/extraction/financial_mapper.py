@@ -575,7 +575,7 @@ def _call_claude_with_retry(client, model: str, max_tokens: int, prompt: str, ma
             response = client.messages.create(
                 model=model,
                 max_tokens=max_tokens,
-                timeout=45.0,  # 45 second timeout per API call
+                timeout=90.0,  # 90 second timeout per API call (large prompts ~15k tokens need more time)
                 messages=[{"role": "user", "content": prompt}]
             )
             return response.content[0].text
@@ -666,7 +666,7 @@ def map_financials_with_ai(
         response_text = _call_claude_with_retry(
             client,
             model="claude-sonnet-4-6",
-            max_tokens=2048,
+            max_tokens=4096,
             prompt=prompt,
             max_retries=2,
         )
@@ -693,7 +693,7 @@ def map_financials_with_ai(
                 retry_response = _call_claude_with_retry(
                     client,
                     model="claude-sonnet-4-6",
-                    max_tokens=2048,
+                    max_tokens=4096,
                     prompt=retry_prompt,
                     max_retries=1,
                 )
