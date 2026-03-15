@@ -549,6 +549,17 @@ def _compute_ifrs16_totals(fields: dict, confidence: dict) -> list:
                  min(confidence.get("revenue_mn", 0.8), confidence.get("operating_expenses_mn", 0.8)) * 0.9,
                  f"Computed ebit_mn = Revenue({revenue}) - OpEx({opex}) - D&A({dep_total + amort}) = {round(calc_ebit, 1)}")
 
+    # ── EBITDA fallback: always compute from EBIT + D&A if not extracted ──
+    # Re-read ebit in case we just computed it above
+    ebit = _get("ebit_mn")
+    ebitda = _get("ebitda_mn")
+    if ebitda is None and ebit is not None:
+        da = (dep_total or 0) + (amort or 0)
+        calc_ebitda = ebit + da
+        _set("ebitda_mn", round(calc_ebitda, 1),
+             confidence.get("ebit_mn", 0.8) * 0.95,
+             f"Computed ebitda_mn = EBIT({ebit}) + D&A({da}) = {round(calc_ebitda, 1)}")
+
     return notes
 
 
