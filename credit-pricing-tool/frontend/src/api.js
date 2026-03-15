@@ -11,16 +11,27 @@ export async function analyzeFinancials(formData) {
   const financials = {
     revenue_mn: parseFloat(formData.revenue) || 0,
     ebit_mn: parseFloat(formData.ebit) || 0,
+    ebitda_mn: parseFloat(formData.ebitda) || 0,
     depreciation_mn: parseFloat(formData.depreciation) || 0,
+    depreciation_ppe_mn: parseFloat(formData.depreciationPpe) || 0,
+    depreciation_rou_mn: parseFloat(formData.depreciationRou) || 0,
     amortization_mn: parseFloat(formData.amortization) || 0,
+    impairment_mn: parseFloat(formData.impairment) || 0,
+    operating_expenses_mn: parseFloat(formData.operatingExpenses) || 0,
     interest_expense_mn: parseFloat(formData.interestExpense) || 0,
+    interest_debt_mn: parseFloat(formData.interestDebt) || 0,
+    interest_lease_mn: parseFloat(formData.interestLease) || 0,
     cash_interest_paid_mn: parseFloat(formData.cashInterestPaid) || 0,
     cash_taxes_paid_mn: parseFloat(formData.cashTaxesPaid) || 0,
     total_debt_mn: parseFloat(formData.totalDebt) || 0,
     st_debt_mn: parseFloat(formData.stDebt) || 0,
     cpltd_mn: parseFloat(formData.cpltd) || 0,
     lt_debt_net_mn: parseFloat(formData.ltDebt) || 0,
-    capital_leases_mn: parseFloat(formData.capitalLeases) || 0,
+    lease_liabilities_mn: parseFloat(formData.leaseTotal) || 0,
+    lease_liabilities_current_mn: parseFloat(formData.leaseCurrent) || 0,
+    lease_liabilities_noncurrent_mn: parseFloat(formData.leaseNoncurrent) || 0,
+    rou_assets_mn: parseFloat(formData.rouAssets) || 0,
+    capital_leases_mn: parseFloat(formData.leaseTotal) || parseFloat(formData.capitalLeases) || 0,
     cash_mn: parseFloat(formData.cash) || 0,
     cash_like_mn: parseFloat(formData.cashLikeAssets) || 0,
     total_equity_mn: parseFloat(formData.totalEquity) || 0,
@@ -34,6 +45,7 @@ export async function analyzeFinancials(formData) {
     assets_prior_mn: parseFloat(formData.totalAssetsPrior) || 0,
     cfo_mn: parseFloat(formData.cfo) || 0,
     capex_mn: parseFloat(formData.capex) || 0,
+    lease_principal_payments_mn: parseFloat(formData.leasePrincipal) || 0,
     common_dividends_mn: parseFloat(formData.commonDividends) || 0,
     preferred_dividends_mn: parseFloat(formData.preferredDividends) || 0,
     minority_dividends_mn: parseFloat(formData.minorityDividends) || 0,
@@ -81,7 +93,10 @@ export async function analyzeFinancials(formData) {
     const data = await response.json()
 
     // Map backend response to frontend format
-    const ebitda = financials.ebit_mn + financials.depreciation_mn + financials.amortization_mn
+    // Use extracted EBITDA if available; otherwise compute from EBIT + D&A
+    const ebitda = financials.ebitda_mn > 0
+      ? financials.ebitda_mn
+      : financials.ebit_mn + financials.depreciation_mn + financials.amortization_mn
     const netDebt = financials.total_debt_mn - financials.cash_mn - financials.cash_like_mn
 
     return {
@@ -420,6 +435,73 @@ export async function getAuditDetail(auditId) {
     return await response.json()
   } catch (error) {
     console.error('Error fetching audit detail:', error)
+    throw error
+  }
+}
+
+/**
+ * Save an extraction result for later review.
+ * @param {Object} extraction - { name, filename, extracted_fields, confidence_scores, extraction_method, sector_classification, business_description, warnings, fiscal_period }
+ */
+export async function saveExtraction(extraction) {
+  try {
+    const response = await fetch(`${API_BASE}/api/extractions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(extraction),
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.detail || `API error: ${response.statusText}`)
+    }
+    return await response.json()
+  } catch (error) {
+    console.error('Error saving extraction:', error)
+    throw error
+  }
+}
+
+/**
+ * List saved extractions (summary only).
+ * @param {number} limit - Max items to return
+ */
+export async function listExtractions(limit = 50) {
+  try {
+    const response = await fetch(`${API_BASE}/api/extractions?limit=${limit}`)
+    if (!response.ok) throw new Error(`API error: ${response.statusText}`)
+    return await response.json()
+  } catch (error) {
+    console.error('Error listing extractions:', error)
+    throw error
+  }
+}
+
+/**
+ * Load a saved extraction by ID (full data).
+ * @param {string} id - Extraction UUID
+ */
+export async function loadExtraction(id) {
+  try {
+    const response = await fetch(`${API_BASE}/api/extractions/${id}`)
+    if (!response.ok) throw new Error(`API error: ${response.statusText}`)
+    return await response.json()
+  } catch (error) {
+    console.error('Error loading extraction:', error)
+    throw error
+  }
+}
+
+/**
+ * Delete a saved extraction.
+ * @param {string} id - Extraction UUID
+ */
+export async function deleteExtraction(id) {
+  try {
+    const response = await fetch(`${API_BASE}/api/extractions/${id}`, { method: 'DELETE' })
+    if (!response.ok) throw new Error(`API error: ${response.statusText}`)
+    return await response.json()
+  } catch (error) {
+    console.error('Error deleting extraction:', error)
     throw error
   }
 }

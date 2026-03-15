@@ -473,6 +473,98 @@ class SupabaseRepository:
             SupabaseRepository._handle_error(e, "get_pdf_upload")
             return None
 
+    # =========================================================================
+    # SAVED EXTRACTIONS
+    # =========================================================================
+
+    @staticmethod
+    def save_extraction(
+        name: str,
+        filename: Optional[str],
+        extracted_fields: Dict[str, Any],
+        confidence_scores: Optional[Dict[str, Any]] = None,
+        extraction_method: str = "ai",
+        sector_classification: Optional[Dict[str, Any]] = None,
+        business_description: Optional[str] = None,
+        warnings: Optional[list] = None,
+        fiscal_period: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Save an extraction result for later review."""
+        client = get_client()
+        if not client:
+            return None
+
+        try:
+            data = {
+                "name": name,
+                "filename": filename,
+                "extracted_fields": extracted_fields,
+                "confidence_scores": confidence_scores or {},
+                "extraction_method": extraction_method,
+                "sector_classification": sector_classification,
+                "business_description": business_description,
+                "warnings": warnings or [],
+                "fiscal_period": fiscal_period,
+            }
+            response = client.table("saved_extractions").insert(data).execute()
+            return response.data[0] if response.data else None
+        except Exception as e:
+            SupabaseRepository._handle_error(e, "save_extraction")
+            return None
+
+    @staticmethod
+    def list_extractions(limit: int = 50) -> List[Dict[str, Any]]:
+        """List saved extractions, newest first."""
+        client = get_client()
+        if not client:
+            return []
+
+        try:
+            response = (
+                client.table("saved_extractions")
+                .select("id, name, filename, extraction_method, fiscal_period, created_at")
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            SupabaseRepository._handle_error(e, "list_extractions")
+            return []
+
+    @staticmethod
+    def get_extraction(extraction_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single saved extraction by ID (full data)."""
+        client = get_client()
+        if not client:
+            return None
+
+        try:
+            response = (
+                client.table("saved_extractions")
+                .select("*")
+                .eq("id", extraction_id)
+                .execute()
+            )
+            return response.data[0] if response.data else None
+        except Exception as e:
+            SupabaseRepository._handle_error(e, "get_extraction")
+            return None
+
+    @staticmethod
+    def delete_extraction(extraction_id: str) -> bool:
+        """Delete a saved extraction."""
+        client = get_client()
+        if not client:
+            return False
+
+        try:
+            client.table("saved_extractions").delete().eq("id", extraction_id).execute()
+            return True
+        except Exception as e:
+            SupabaseRepository._handle_error(e, "delete_extraction")
+            return False
+
     @staticmethod
     def get_pdf_uploads(user_id: str) -> List[Dict[str, Any]]:
         """

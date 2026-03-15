@@ -207,7 +207,9 @@ def compute_universal_metrics(financials: dict) -> dict:
     capex_mn = financials.get("capex_mn", 0.0)
     cfo_mn = financials.get("cfo_mn", 0.0)
 
-    ebitda = ebit_mn + dep_mn + amort_mn
+    # Use extracted EBITDA if available; otherwise compute from EBIT + D&A
+    extracted_ebitda = financials.get("ebitda_mn", 0.0)
+    ebitda = extracted_ebitda if extracted_ebitda else (ebit_mn + dep_mn + amort_mn)
     total_debt = compute_total_debt(financials)
     net_debt = compute_net_debt(total_debt, financials)
     ffo = compute_ffo(financials)

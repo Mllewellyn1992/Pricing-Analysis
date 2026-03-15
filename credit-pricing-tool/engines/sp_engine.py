@@ -243,7 +243,9 @@ def _extract_financial_inputs(financials: dict) -> dict:
     )
     share_buybacks_mn = financials.get("share_buybacks_mn", 0.0)
 
-    ebitda_mn = ebit_mn + dep_mn + amort_mn
+    # Use extracted EBITDA if available; otherwise compute from EBIT + D&A
+    extracted_ebitda = financials.get("ebitda_mn", 0.0)
+    ebitda_mn = extracted_ebitda if extracted_ebitda else (ebit_mn + dep_mn + amort_mn)
     ffo_mn = ebitda_mn - cash_interest_paid_mn - cash_taxes_paid_mn
     return {
         "revenue_mn": revenue_mn, "ebit_mn": ebit_mn, "ebitda_mn": ebitda_mn,

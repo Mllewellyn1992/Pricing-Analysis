@@ -413,6 +413,96 @@ def update_pdf_status(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+# =========================================================================
+# SAVED EXTRACTIONS
+# =========================================================================
+
+
+class ExtractionSaveRequest(BaseModel):
+    """Save an extraction result."""
+
+    name: str
+    filename: Optional[str] = None
+    extracted_fields: Dict[str, Any] = {}
+    confidence_scores: Optional[Dict[str, Any]] = None
+    extraction_method: str = "ai"
+    sector_classification: Optional[Dict[str, Any]] = None
+    business_description: Optional[str] = None
+    warnings: Optional[List[Any]] = None
+    fiscal_period: Optional[str] = None
+
+
+@router.post("/extractions")
+def save_extraction(req: ExtractionSaveRequest) -> Dict[str, Any]:
+    """Save an extraction for later review."""
+    _check_configured()
+
+    try:
+        result = SupabaseRepository.save_extraction(
+            name=req.name,
+            filename=req.filename,
+            extracted_fields=req.extracted_fields,
+            confidence_scores=req.confidence_scores,
+            extraction_method=req.extraction_method,
+            sector_classification=req.sector_classification,
+            business_description=req.business_description,
+            warnings=req.warnings,
+            fiscal_period=req.fiscal_period,
+        )
+
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to save extraction")
+
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@router.get("/extractions")
+def list_extractions(limit: int = Query(50, ge=1, le=200)) -> List[Dict[str, Any]]:
+    """List saved extractions (summary only)."""
+    _check_configured()
+
+    try:
+        return SupabaseRepository.list_extractions(limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@router.get("/extractions/{extraction_id}")
+def get_extraction(extraction_id: str) -> Dict[str, Any]:
+    """Get a saved extraction by ID (full data including all fields)."""
+    _check_configured()
+
+    try:
+        result = SupabaseRepository.get_extraction(extraction_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Extraction not found")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@router.delete("/extractions/{extraction_id}")
+def delete_extraction(extraction_id: str) -> Dict[str, str]:
+    """Delete a saved extraction."""
+    _check_configured()
+
+    try:
+        success = SupabaseRepository.delete_extraction(extraction_id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete extraction")
+        return {"status": "deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
 @router.get("/pdf-uploads")
 def list_pdf_uploads(user_id: str = Query(...)) -> List[Dict[str, Any]]:
     """
