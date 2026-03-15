@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { analyzeFinancials, getAllProducts, uploadPDF, pingServer } from '../api'
 
 const EXTRACTION_TO_FORM = {
-  revenue_mn: 'revenue', ebit_mn: 'ebit', depreciation_mn: 'depreciation',
+  revenue_mn: 'revenue', operating_expenses_mn: 'operatingExpenses',
+  ebit_mn: 'ebit', ebitda_mn: 'ebitda', impairment_mn: 'impairment',
+  depreciation_mn: 'depreciation',
   depreciation_ppe_mn: 'depreciationPpe', depreciation_rou_mn: 'depreciationRou',
   amortization_mn: 'amortization', interest_expense_mn: 'interestExpense',
   interest_debt_mn: 'interestDebt', interest_lease_mn: 'interestLease',
@@ -402,7 +404,9 @@ function AnalysisForm({ onResults, extractedData, onClearExtracted }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
           <Section title="Income Statement (000s)" id="income">
             <Table rows={[
-              ['revenue','Revenue'],['ebit','EBIT'],
+              ['revenue','Revenue'],['operatingExpenses','OpEx (ex D&A)'],
+              ['ebit','EBIT (ex Impairment)'],['ebitda','EBITDA'],
+              ['impairment','Impairment'],
               ['depreciation','Depreciation (Total)'],
               ['depreciationPpe','  ↳ PPE Only'],['depreciationRou','  ↳ ROU (Lease)'],
               ['amortization','Amortization'],

@@ -22,7 +22,10 @@ logger = logging.getLogger(__name__)
 # Standard financial fields we try to extract (values in THOUSANDS)
 FINANCIAL_FIELDS = {
     "revenue_mn": "Total revenue or net sales (thousands)",
-    "ebit_mn": "EBIT or operating income (thousands)",
+    "ebit_mn": "EBIT or operating income EXCLUDING impairments (thousands) — recurring operating earnings only",
+    "ebitda_mn": "EBITDA or EBITDAF EXCLUDING impairments (thousands) — if explicitly stated in report",
+    "impairment_mn": "Impairment charges — asset write-downs, goodwill impairment, etc. (thousands, POSITIVE number)",
+    "operating_expenses_mn": "Total operating expenses before D&A and before impairments (thousands, POSITIVE number)",
     # ── IFRS-16 lease breakdown: depreciation ──
     "depreciation_mn": "TOTAL depreciation incl. ROU assets (thousands) — must equal depreciation_ppe_mn + depreciation_rou_mn",
     "depreciation_ppe_mn": "Depreciation of property, plant & equipment ONLY, excluding right-of-use assets (thousands)",
@@ -311,10 +314,19 @@ WHERE TO FIND EACH FIELD
 ═══════════════════════════════════════════════════════════
 - revenue_mn: Look for "Revenue", "Retail sales", "Net sales", "Sales" in the INCOME STATEMENT
   (NOT in narrative summaries or "at a glance" sections)
-- ebit_mn: "Operating profit", "Earnings before interest and tax", "EBIT" in INCOME STATEMENT
-  If no explicit EBIT line, CALCULATE it: Total Revenue - Operating Expenses - D&A
-  OR if you see EBITDAF/EBITDA, calculate: EBITDAF - Depreciation - Amortisation
-  OR calculate: Profit before tax + Finance costs (excluding imputed interest on deposits)
+- ebit_mn: RECURRING operating earnings EXCLUDING impairments. This is critical for credit analysis.
+  Look for "Operating profit", "Earnings before interest and tax", "EBIT" in INCOME STATEMENT.
+  If no explicit EBIT line exists, CALCULATE it using ONE of these methods (in priority order):
+  METHOD 1: Total Revenue - Operating Expenses - Depreciation & Amortisation (EXCLUDE impairments)
+  METHOD 2: EBITDA/EBITDAF - Depreciation - Amortisation (EXCLUDE impairments)
+  METHOD 3: Profit before tax + Finance costs (EXCLUDE impairments, EXCLUDE imputed interest on deposits)
+  *** CRITICAL: ALWAYS EXCLUDE impairment charges from EBIT. Impairments are non-recurring. ***
+  *** Also EXCLUDE imputed interest income/charges on accommodation deposits (retirement village accounting) ***
+- ebitda_mn: Only extract if explicitly stated (e.g. "EBITDA", "EBITDAF"). Exclude impairments.
+- impairment_mn: "Impairment loss", "Impairment of assets", "Write-down" — report as POSITIVE number.
+  This is extracted separately so EBIT can be cross-validated.
+- operating_expenses_mn: Total operating expenses BEFORE D&A and BEFORE impairments — report as POSITIVE.
+  Look for "Operating expenses", "Total operating expenses". Exclude D&A and impairments.
 - cfo_mn: "Net cash flows from operating activities" in CASH FLOW STATEMENT
 - capex_mn: "Purchase of property, plant and equipment" or "Capital expenditure" in CASH FLOW STATEMENT
   (report as POSITIVE number even if shown as negative in the statement)
@@ -396,6 +408,9 @@ RULES:
 7. Break out IFRS-16 lease components wherever possible — see the IFRS-16 section above
 8. depreciation_mn MUST be the TOTAL (PPE + ROU), NOT just one component
 9. interest_expense_mn MUST be the TOTAL (debt + lease), NOT just one component
+10. ebit_mn MUST EXCLUDE impairment charges — S&P and Moody's both strip these out for credit analysis
+11. impairment_mn should be POSITIVE (e.g. if income statement shows "(87,513)", extract as 87513)
+12. operating_expenses_mn should be POSITIVE and EXCLUDE D&A and impairments
 """
 
 
@@ -511,6 +526,28 @@ def _compute_ifrs16_totals(fields: dict, confidence: dict) -> list:
         _set("lease_liabilities_mn", fields["capital_leases_mn"],
              confidence.get("capital_leases_mn", 0.8),
              f"Mapped capital_leases_mn → lease_liabilities_mn = {fields['capital_leases_mn']}")
+
+    # ── EBIT fallback computation ──
+    ebit = _get("ebit_mn")
+    ebitda = _get("ebitda_mn")
+    dep_total = _get("depreciation_mn") or 0
+    amort = _get("amortization_mn") or 0
+    revenue = _get("revenue_mn")
+    opex = _get("operating_expenses_mn")
+
+    if ebit is None:
+        # Try EBITDA - D&A first (most reliable)
+        if ebitda is not None:
+            calc_ebit = ebitda - dep_total - amort
+            _set("ebit_mn", round(calc_ebit, 1),
+                 confidence.get("ebitda_mn", 0.8) * 0.95,
+                 f"Computed ebit_mn = EBITDA({ebitda}) - D&A({dep_total + amort}) = {round(calc_ebit, 1)}")
+        # Try Revenue - OpEx - D&A
+        elif revenue is not None and opex is not None:
+            calc_ebit = revenue - opex - dep_total - amort
+            _set("ebit_mn", round(calc_ebit, 1),
+                 min(confidence.get("revenue_mn", 0.8), confidence.get("operating_expenses_mn", 0.8)) * 0.9,
+                 f"Computed ebit_mn = Revenue({revenue}) - OpEx({opex}) - D&A({dep_total + amort}) = {round(calc_ebit, 1)}")
 
     return notes
 
@@ -767,11 +804,38 @@ def _arithmetic_validation(fields: dict) -> list:
             "field_hint": "capex_mn",
         })
 
-    # 4. EBIT/EBITDA relationship: EBIT + D&A should ≈ EBITDA
+    # 4. EBIT cross-validation: Revenue - OpEx - D&A should ≈ EBIT (excluding impairments)
     ebit = _get("ebit_mn")
     dep = _get("depreciation_mn") or 0
     amort = _get("amortization_mn") or 0
     revenue = _get("revenue_mn")
+    opex = _get("operating_expenses_mn")
+    ebitda = _get("ebitda_mn")
+    impairment = _get("impairment_mn") or 0
+
+    # 4a. If we have Revenue and OpEx, cross-check EBIT = Revenue - OpEx - D&A
+    if ebit is not None and revenue is not None and opex is not None:
+        # OpEx is stored as positive, so subtract it
+        calc_ebit = revenue - opex - dep - amort
+        _check("EBIT should ≈ Revenue - OpEx - D&A (ex-impairment)", ebit, round(calc_ebit, 1), 10, "ebit_mn")
+
+    # 4b. If we have EBITDA, cross-check EBIT = EBITDA - D&A
+    if ebit is not None and ebitda is not None:
+        calc_ebit_from_ebitda = ebitda - dep - amort
+        _check("EBIT should ≈ EBITDA - D&A", ebit, round(calc_ebit_from_ebitda, 1), 10, "ebit_mn")
+
+    # 4c. Impairment sanity: if impairment exists, it should be < revenue
+    if impairment > 0 and revenue is not None and revenue > 0:
+        if impairment > revenue:
+            issues.append({
+                "check": "impairment should be < revenue",
+                "expected": revenue,
+                "actual": impairment,
+                "diff": round(impairment - revenue, 1),
+                "pct_off": round((impairment / revenue) * 100, 1),
+                "severity": "warning",
+                "field_hint": "impairment_mn",
+            })
 
     # 5. EBIT should be < Revenue in absolute terms
     if ebit is not None and revenue is not None and revenue != 0:

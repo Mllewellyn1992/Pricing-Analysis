@@ -31,7 +31,7 @@ _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="extract")
 
 # ── Simple in-memory extraction cache (file hash → result) ───────────────────
 # Cache version: increment when extraction logic changes to invalidate stale results
-_CACHE_VERSION = "v3_ifrs16"
+_CACHE_VERSION = "v4_impairment"
 _extraction_cache: Dict[str, dict] = {}
 _CACHE_MAX_SIZE = 20  # Keep last 20 extractions
 
